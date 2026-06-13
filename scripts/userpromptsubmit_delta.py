@@ -1,22 +1,21 @@
 #!/usr/bin/env python3
-"""Assertion memory UserPromptSubmit hook → inject significant changes since last sync.
+"""Assertion memory UserPromptSubmit hook — two jobs, both structural (no thresholds):
 
-A session already in motion does not see decisions made by *other* concurrent
-sessions (its working-set was injected at SessionStart and won't refresh until the
-next startup/resume/clear/compact). This hook closes that gap: on each prompt it
-asks the backend for L1/L2 nodes changed since this session last synced, and injects
-only the delta as `additionalContext`.
+1. Cross-session awareness: inject the L1/L2 nodes changed since this session last synced,
+   so a session in motion sees decisions made by other sessions without a restart. Injects
+   only on real change; append-only, so the prompt cache stays warm.
 
-Cheap by design: the backend delta is a tree read + filter (no LLM), and because it
-is filtered to L1/L2, `changed` is empty on the vast majority of turns even as the
-turn counter climbs — so injection (and prompt-cache disruption) happens only when a
-genuinely significant decision lands. Stdlib-only; fail-open (any error → exit 0).
+2. Focus tracking (write-driven): focus = the deepest, most-recently-changed node in the
+   tree (where work is landing) — read straight from the delta's turn/level numbers, no
+   lexical matching. Written to the shared session state file so the Stop hook can pass it
+   to /update, anchoring placement to where this session is working.
+
+Stdlib-only; fail-open (any error → exit 0, no output, never blocks).
 
 Env (URL set inline by the plugin's hook command; you only set the key):
-  ASSERTION_API_KEY     your Assertion api_key  (fallback: CONTEXT_TREE_API_KEY)
-  ASSERTION_SERVER_URL  backend base URL        (fallback: CONTEXT_TREE_SERVER_URL)
-  ASSERTION_PATH_PREFIX optional, default "/memory"
-  ASSERTION_WORKSPACE   optional workspace header, default "default"
+  ASSERTION_API_KEY  / CONTEXT_TREE_API_KEY
+  ASSERTION_SERVER_URL / CONTEXT_TREE_SERVER_URL   (default https://memory.assertion-ai.com)
+  ASSERTION_PATH_PREFIX (default "/memory")   ASSERTION_WORKSPACE (default "default")
 """
 from __future__ import annotations
 
@@ -30,7 +29,7 @@ import urllib.request
 
 def _state_path(session_id: str) -> str:
     safe = "".join(c for c in (session_id or "default") if c.isalnum() or c in "-_")[:64] or "default"
-    return os.path.join(tempfile.gettempdir(), f"assertion_delta_{safe}.turn")
+    return os.path.join(tempfile.gettempdir(), f"assertion_session_{safe}.json")
 
 
 def main() -> int:
@@ -43,60 +42,68 @@ def main() -> int:
             pass
 
         base = (os.environ.get("ASSERTION_SERVER_URL")
-                or os.environ.get("CONTEXT_TREE_SERVER_URL") or "").rstrip("/")
+                or os.environ.get("CONTEXT_TREE_SERVER_URL") or "https://memory.assertion-ai.com").rstrip("/")
         key = os.environ.get("ASSERTION_API_KEY") or os.environ.get("CONTEXT_TREE_API_KEY", "")
         if not base or not key:
             return 0
-
         prefix = (os.environ.get("ASSERTION_PATH_PREFIX")
                   or os.environ.get("CONTEXT_TREE_PATH_PREFIX") or "/memory").rstrip("/")
         workspace = (os.environ.get("ASSERTION_WORKSPACE")
                      or os.environ.get("CONTEXT_TREE_WORKSPACE") or "default")
 
-        state = _state_path(session_id)
-        last = None
+        state_path = _state_path(session_id)
+        state = {}
         try:
-            with open(state) as f:
-                last = int(f.read().strip())
+            with open(state_path) as f:
+                state = json.load(f) or {}
         except Exception:
-            last = None
+            state = {}
+        last = state.get("last_seen_turn")
+        focus = state.get("focus")
 
-        qs = urllib.parse.urlencode({"since_turn": last if last is not None else 0})
-        url = f"{base}{prefix}/working-set/delta?{qs}"
-        req = urllib.request.Request(url, headers={"x-api-key": key, "X-Assertion-Workspace": workspace})
+        # All-levels delta so we can see where deep writes landed (focus is structural).
+        qs = urllib.parse.urlencode({"since_turn": last if last is not None else 0, "levels": "all"})
+        req = urllib.request.Request(
+            f"{base}{prefix}/working-set/delta?{qs}",
+            headers={"x-api-key": key, "X-Assertion-Workspace": workspace})
         with urllib.request.urlopen(req, timeout=5) as resp:
             data = json.loads(resp.read().decode("utf-8", "replace"))
 
         current = int(data.get("n_turns_processed", 0))
         changed = data.get("changed") or []
 
-        # Always advance the baseline so we never re-inject the same delta twice.
+        # Focus = deepest, most-recently-changed node (where work is landing). Pure numbers:
+        # max turn, tie-break deepest level. No match landed since last sync → keep prior focus.
+        active = [c for c in changed if c.get("status") == "active"]
+        if active:
+            top = max(active, key=lambda c: (c.get("turn", 0), c.get("level", 0)))
+            focus = top["id"]
+
+        # Persist state for the Stop hook (focus) and next prompt (cursor).
         try:
-            with open(state, "w") as f:
-                f.write(str(current))
+            with open(state_path, "w") as f:
+                json.dump({"last_seen_turn": current, "focus": focus}, f)
         except Exception:
             pass
 
-        # First prompt of a session: SessionStart already injected the full working
-        # set, so just record the baseline and inject nothing. Otherwise inject only
-        # when something significant actually changed.
-        if last is None or not changed:
+        # Awareness injection: only L1/L2 changes, only after a baseline exists, only on change.
+        sig = [c for c in changed if c.get("level") in (1, 2)]
+        if last is None or not sig:
             return 0
-
         lines = []
-        for c in changed:
+        for c in sig:
             tag = "" if c.get("status") == "active" else "/superseded"
             lines.append(f"[{c['id']}] (L{c['level']}{tag}) {c['claim']}")
         context = (
             "<assertion_memory_updates>\n"
-            "Significant shared-memory updates since you last synced "
-            "(other sessions or your own prior turns may have made these). "
-            "Treat as background you now know; drill in with the memory tools.\n\n"
+            "Significant shared-memory updates since you last synced (other sessions or your "
+            "own prior turns may have made these). Treat as background you now know; drill in "
+            "with the memory tools.\n\n"
             + "\n".join(lines)
             + "\n</assertion_memory_updates>"
         )
-        out = {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": context}}
-        sys.stdout.write(json.dumps(out))
+        sys.stdout.write(json.dumps(
+            {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": context}}))
     except Exception:
         return 0  # fail-open
     return 0

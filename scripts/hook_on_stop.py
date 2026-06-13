@@ -15,12 +15,25 @@ from __future__ import annotations
 import json
 import os
 import sys
+import tempfile
 import urllib.request
 
 UPDATE_URL = (os.environ.get("ASSERTION_UPDATE_URL")
               or os.environ.get("CONTEXT_TREE_UPDATE_URL")
               or "https://memory.assertion-ai.com/memory/update")
 TIMEOUT_SECONDS = 5  # don't block Claude Code if the server is down
+
+
+def _read_focus(session_id: str):
+    """Read this session's current focus anchor (where work is landing), written by the
+    UserPromptSubmit hook. Passed to /update so the backend anchors placement there."""
+    safe = "".join(c for c in (session_id or "default") if c.isalnum() or c in "-_")[:64] or "default"
+    path = os.path.join(tempfile.gettempdir(), f"assertion_session_{safe}.json")
+    try:
+        with open(path) as f:
+            return (json.load(f) or {}).get("focus")
+    except Exception:
+        return None
 
 
 def _extract_text(content) -> str:
@@ -91,7 +104,11 @@ def main() -> int:
             "Assertion memory: ASSERTION_API_KEY not set — capture is OFF for this turn.\n"
             "Add it to ~/.claude/settings.json under \"env\" so it reaches both the tools and the hook.\n")
         return 0
-    body = json.dumps({"user_text": user_text, "assistant_text": assistant_text}).encode()
+    update = {"user_text": user_text, "assistant_text": assistant_text}
+    focus = _read_focus(payload.get("session_id"))
+    if focus:
+        update["focus"] = focus   # anchor placement to where this session is working
+    body = json.dumps(update).encode()
     headers = {"Content-Type": "application/json", "x-api-key": api_key}
     req = urllib.request.Request(UPDATE_URL, data=body, headers=headers, method="POST")
     try:
