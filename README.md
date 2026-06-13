@@ -7,14 +7,21 @@ context injection. By [Assertion AI](https://assertion-ai.com).
 
 ## Install
 
-```bash
+```
 # 1) in Claude Code:
 /plugin marketplace add Assertion-AI/assertion
 /plugin install assertion@assertion-ai
-
-# 2) in your shell (add to ~/.zshrc to persist), then launch Claude Code from that terminal:
-export ASSERTION_API_KEY=<your key>
 ```
+
+**2) Add your key to `~/.claude/settings.json`** (create the file if needed):
+```json
+{
+  "env": { "ASSERTION_API_KEY": "<your key>" }
+}
+```
+The `env` block is the reliable way to provide the key — Claude Code injects it into
+**both** the memory tools (MCP) **and** the capture hook, so your turns are actually
+recorded. It also works **regardless of how you launch Claude Code** (terminal or app).
 
 Get your key at https://assertion-ai.com. Restart Claude Code; run `/mcp` to confirm
 `assertion` is connected, then try `recall <topic>`.
@@ -22,8 +29,9 @@ Get your key at https://assertion-ai.com. Restart Claude Code; run `/mcp` to con
 **Requirements:** a system `python3` (for the two stdlib hooks). No other deps — the
 memory tools connect over HTTP.
 
-**Note:** launch Claude Code from a terminal where `ASSERTION_API_KEY` is exported
-(a Dock/GUI launch won't see your shell env).
+> Prefer `~/.claude/settings.json` `env` over `export ASSERTION_API_KEY`. With a bare
+> `export`, the key only reaches the plugin if you launch Claude Code from that same
+> shell — set it in `settings.json` and capture works either way.
 
 ## What's included
 

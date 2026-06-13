@@ -83,11 +83,16 @@ def main() -> int:
     if not user_text and not assistant_text:
         return 0
 
-    body = json.dumps({"user_text": user_text, "assistant_text": assistant_text}).encode()
-    headers = {"Content-Type": "application/json"}
     api_key = os.environ.get("ASSERTION_API_KEY") or os.environ.get("CONTEXT_TREE_API_KEY", "")
-    if api_key:
-        headers["x-api-key"] = api_key
+    if not api_key:
+        # Don't post unauthenticated (it would 401 and silently drop the turn).
+        # Warn loudly so a misconfigured setup is visible, not a quietly empty tree.
+        sys.stderr.write(
+            "Assertion memory: ASSERTION_API_KEY not set — capture is OFF for this turn.\n"
+            "Add it to ~/.claude/settings.json under \"env\" so it reaches both the tools and the hook.\n")
+        return 0
+    body = json.dumps({"user_text": user_text, "assistant_text": assistant_text}).encode()
+    headers = {"Content-Type": "application/json", "x-api-key": api_key}
     req = urllib.request.Request(UPDATE_URL, data=body, headers=headers, method="POST")
     try:
         with urllib.request.urlopen(req, timeout=TIMEOUT_SECONDS) as resp:
