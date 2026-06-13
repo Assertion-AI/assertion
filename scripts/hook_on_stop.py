@@ -105,9 +105,12 @@ def main() -> int:
             "Add it to ~/.claude/settings.json under \"env\" so it reaches both the tools and the hook.\n")
         return 0
     update = {"user_text": user_text, "assistant_text": assistant_text}
-    focus = _read_focus(payload.get("session_id"))
+    sid = payload.get("session_id")
+    if sid:
+        update["session_id"] = sid   # stamps last_session on touched nodes (focus attribution)
+    focus = _read_focus(sid)
     if focus:
-        update["focus"] = focus   # anchor placement to where this session is working
+        update["focus"] = focus      # anchor placement to where this session is working
     body = json.dumps(update).encode()
     headers = {"Content-Type": "application/json", "x-api-key": api_key}
     req = urllib.request.Request(UPDATE_URL, data=body, headers=headers, method="POST")

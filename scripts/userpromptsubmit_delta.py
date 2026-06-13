@@ -90,10 +90,16 @@ def main() -> int:
         sections: list[str] = []
         first_run = last is None
 
-        # focus = deepest most-recent active change (else keep prior)
+        # focus = deepest most-recent active change FROM THIS SESSION (else keep prior).
+        # Sourcing from own-session writes only is what stops a concurrent session's deep
+        # writes from hijacking this session's focus. If this session hasn't written
+        # (mine empty — including pre-attribution unstamped nodes), we KEEP the prior focus
+        # rather than fall back to global; falling back would re-open the pollution. A brand
+        # new session simply has no deep focus until it writes — correct (nothing to zoom yet).
         focus_meta = None
-        if active:
-            focus_meta = max(active, key=lambda c: (c.get("turn", 0), c.get("level", 0)))
+        mine = [c for c in active if c.get("session_id") == session_id]
+        if mine:
+            focus_meta = max(mine, key=lambda c: (c.get("turn", 0), c.get("level", 0)))
             focus = focus_meta["id"]
 
         # ---- B. INVALIDATE (one-hop): a changed X refreshes lenses == X or whose parent == X ----
