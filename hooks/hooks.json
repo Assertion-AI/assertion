@@ -20,6 +20,16 @@
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ASSERTION_SERVER_URL=https://memory.assertion-ai.com python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/userpromptsubmit_delta.py\""
+          }
+        ]
+      }
     ]
   }
 }
