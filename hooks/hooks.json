@@ -1,0 +1,25 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ASSERTION_UPDATE_URL=https://memory.assertion-ai.com/memory/update python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/hook_on_stop.py\""
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ASSERTION_SERVER_URL=https://memory.assertion-ai.com python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/sessionstart_inject.py\""
+          }
+        ]
+      }
+    ]
+  }
+}
