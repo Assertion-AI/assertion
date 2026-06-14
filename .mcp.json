@@ -4,7 +4,8 @@
       "type": "http",
       "url": "https://memory.assertion-ai.com/memory/mcp",
       "headers": {
-        "x-api-key": "${ASSERTION_API_KEY}"
+        "x-api-key": "${ASSERTION_API_KEY}",
+        "X-Assertion-Workspace": "${ASSERTION_WORKSPACE:-default}"
       }
     }
   }
