@@ -18,9 +18,15 @@ import sys
 import tempfile
 import urllib.request
 
+# Target defaults to PROD; one env var (ASSERTION_SERVER_URL) redirects all hooks to dev.
+_BASE = (os.environ.get("ASSERTION_SERVER_URL")
+         or os.environ.get("CONTEXT_TREE_SERVER_URL")
+         or "https://memory.assertion-ai.com").rstrip("/")
+_PREFIX = (os.environ.get("ASSERTION_PATH_PREFIX")
+           or os.environ.get("CONTEXT_TREE_PATH_PREFIX") or "/memory").rstrip("/")
 UPDATE_URL = (os.environ.get("ASSERTION_UPDATE_URL")
               or os.environ.get("CONTEXT_TREE_UPDATE_URL")
-              or "https://memory.assertion-ai.com/memory/update")
+              or f"{_BASE}{_PREFIX}/update")
 TIMEOUT_SECONDS = 5  # don't block Claude Code if the server is down
 
 

@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "ASSERTION_UPDATE_URL=https://memory.assertion-ai.com/memory/update python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/hook_on_stop.py\""
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/hook_on_stop.py\""
           }
         ]
       }
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "ASSERTION_SERVER_URL=https://memory.assertion-ai.com python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/sessionstart_inject.py\""
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/sessionstart_inject.py\""
           }
         ]
       }
@@ -26,7 +26,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "ASSERTION_SERVER_URL=https://memory.assertion-ai.com python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/userpromptsubmit_delta.py\""
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/userpromptsubmit_delta.py\""
           }
         ]
       }

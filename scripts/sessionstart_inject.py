@@ -5,11 +5,11 @@ Plugins don't auto-load a CLAUDE.md, so this hook fetches the project's working-
 from the backend and returns it as `additionalContext` — always fresh, no file on
 disk. Stdlib-only; fail-open (any error → exit 0, no output, never blocks a session).
 
-Env (the URL is set inline by the plugin's hook command; you only set the key):
+Env (you set the key; URL/workspace default to PROD and are overridable for dev):
   ASSERTION_API_KEY     your Assertion api_key  (fallback: CONTEXT_TREE_API_KEY)
-  ASSERTION_SERVER_URL  backend base URL        (fallback: CONTEXT_TREE_SERVER_URL)
+  ASSERTION_SERVER_URL  backend base URL, default https://memory.assertion-ai.com (prod)
   ASSERTION_PATH_PREFIX optional, default "/memory"
-  ASSERTION_WORKSPACE   optional workspace header, default "default"
+  ASSERTION_WORKSPACE   optional workspace header, default "default"  (devs: dev-<name>)
 """
 from __future__ import annotations
 
@@ -27,7 +27,8 @@ def main() -> int:
             pass
 
         base = (os.environ.get("ASSERTION_SERVER_URL")
-                or os.environ.get("CONTEXT_TREE_SERVER_URL") or "").rstrip("/")
+                or os.environ.get("CONTEXT_TREE_SERVER_URL")
+                or "https://memory.assertion-ai.com").rstrip("/")
         key = os.environ.get("ASSERTION_API_KEY") or os.environ.get("CONTEXT_TREE_API_KEY", "")
         if not base or not key:
             return 0
