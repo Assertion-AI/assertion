@@ -44,11 +44,3 @@ Add the MCP server (for `recall`/`expand`) from `config.toml.example` to
 | VS Code extension | ✅ (after the one-time Trust toggle) |
 | CLI headless (`codex exec`) | ❌ — no lifecycle-hook engine |
 | Cloud / web | ❌ — runs on OpenAI's machines |
-
-## Pointing a machine at dev (optional)
-Everything defaults to prod. To send one machine to dev instead, override locally:
-- MCP: change the `url` in `config.toml` to
-  `https://auto-insight-product-dev-jbdf42voqq-uc.a.run.app/memory/mcp/<your-dev-workspace>`.
-- Hooks: prepend `ASSERTION_SERVER_URL='<dev url>' ASSERTION_WORKSPACE='<your-dev-workspace>'`
-  to the hook commands.
-Never use the `default` workspace on dev.
