@@ -30,16 +30,18 @@ UPDATE_URL = (os.environ.get("ASSERTION_UPDATE_URL")
 TIMEOUT_SECONDS = 5  # don't block Claude Code if the server is down
 
 
-def _read_focus(session_id: str):
-    """Read this session's current focus anchor (where work is landing), written by the
-    UserPromptSubmit hook. Passed to /update so the backend anchors placement there."""
+def _read_state(session_id: str) -> dict:
+    """Read this session's state file (written by the UserPromptSubmit hook): the current
+    focus anchor (where work is landing) and the latest user prompt. The prompt is used as
+    Codex's user_text — Codex's Stop hook provides the assistant message but not the prompt,
+    whereas Claude Code's Stop walks the transcript for both."""
     safe = "".join(c for c in (session_id or "default") if c.isalnum() or c in "-_")[:64] or "default"
     path = os.path.join(tempfile.gettempdir(), f"assertion_session_{safe}.json")
     try:
         with open(path) as f:
-            return (json.load(f) or {}).get("focus")
+            return json.load(f) or {}
     except Exception:
-        return None
+        return {}
 
 
 def _extract_text(content) -> str:
@@ -94,11 +96,21 @@ def main() -> int:
     except json.JSONDecodeError:
         return 0
 
-    transcript_path = payload.get("transcript_path")
-    if not transcript_path:
-        return 0
+    sid = payload.get("session_id")
 
-    user_text, assistant_text = extract_latest_turn(transcript_path)
+    # Platform detection by input shape — one set of scripts serves Claude Code AND Codex:
+    #   Codex's Stop hook provides `last_assistant_message` directly (and no prompt), so we
+    #   pair it with the prompt the UserPromptSubmit hook stashed in session state.
+    #   Claude Code's Stop has no `last_assistant_message`; we walk the transcript for both.
+    if payload.get("last_assistant_message") is not None:
+        assistant_text = payload.get("last_assistant_message") or ""
+        user_text = _read_state(sid).get("prompt") or ""
+    else:
+        transcript_path = payload.get("transcript_path")
+        if not transcript_path:
+            return 0
+        user_text, assistant_text = extract_latest_turn(transcript_path)
+
     if not user_text and not assistant_text:
         return 0
 
@@ -111,14 +123,19 @@ def main() -> int:
             "Add it to ~/.claude/settings.json under \"env\" so it reaches both the tools and the hook.\n")
         return 0
     update = {"user_text": user_text, "assistant_text": assistant_text}
-    sid = payload.get("session_id")
     if sid:
         update["session_id"] = sid   # stamps last_session on touched nodes (focus attribution)
-    focus = _read_focus(sid)
+    focus = _read_state(sid).get("focus")
     if focus:
         update["focus"] = focus      # anchor placement to where this session is working
     body = json.dumps(update).encode()
-    headers = {"Content-Type": "application/json", "x-api-key": api_key}
+    # Send the workspace header so the WRITE lands in the same workspace the reads use.
+    # Without it the backend defaults to "default" — which would route a dev's captures
+    # (ASSERTION_WORKSPACE=dev-<name>) into the prod tree even though their reads are isolated.
+    workspace = (os.environ.get("ASSERTION_WORKSPACE")
+                 or os.environ.get("CONTEXT_TREE_WORKSPACE") or "default")
+    headers = {"Content-Type": "application/json", "x-api-key": api_key,
+               "X-Assertion-Workspace": workspace}
     req = urllib.request.Request(UPDATE_URL, data=body, headers=headers, method="POST")
     try:
         with urllib.request.urlopen(req, timeout=TIMEOUT_SECONDS) as resp:

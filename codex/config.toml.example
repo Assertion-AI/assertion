@@ -1,0 +1,26 @@
+# Add these to ~/.codex/config.toml to run Assertion memory under Codex.
+# Codex's hook + MCP model mirrors Claude Code's (verified against OpenAI's Codex docs
+# and cmem's codex integration). The hooks invoke the SAME shared scripts as the Claude
+# Code plugin (../scripts) — one copy of the logic, no duplication.
+
+# --- Lifecycle hooks ---------------------------------------------------------
+# Option A (simplest): point Codex at the bundled hooks.json next to this file.
+#   Codex loads hooks from a hooks.json OR an inline [hooks] table.
+# Option B: inline the [hooks] table here (same structure as codex/hooks.json).
+#
+# Either way, set this first so the hook commands resolve:
+#   export ASSERTION_SCRIPTS_DIR="/abs/path/to/assertion-plugin/scripts"
+#   export ASSERTION_API_KEY="<your key>"
+#   export ASSERTION_SERVER_URL="https://auto-insight-product-dev-jbdf42voqq-uc.a.run.app"   # dev
+#   export ASSERTION_WORKSPACE="dev-<name>"   # NEVER 'default' on dev
+
+# --- MCP server (recall / expand tools) --------------------------------------
+# Codex's HTTP MCP supports bearer-token auth (no custom headers), so the backend was
+# aligned to the MCP standard: it accepts `Authorization: Bearer <api_key>` AND reads the
+# workspace from the URL path (/memory/mcp/<workspace>) since Codex can't send the
+# X-Assertion-Workspace header. VERIFIED on dev (codex 0.139.0): Bearer auth + URL-workspace
+# both work; recall returns the right workspace's tree. (Prod after the memory-v* promote.)
+[mcp_servers.assertion]
+url = "https://memory.assertion-ai.com/memory/mcp/${ASSERTION_WORKSPACE}"   # workspace in the PATH
+bearer_token_env_var = "ASSERTION_API_KEY"                                  # sent as Authorization: Bearer
+# For dev, point url at: https://auto-insight-product-dev-jbdf42voqq-uc.a.run.app/memory/mcp/<workspace>

@@ -1,0 +1,15 @@
+{
+  "name": "assertion-memory",
+  "version": "0.1.0",
+  "description": "Persistent, structured project memory across sessions, projects, and agents — for OpenAI Codex.",
+  "author": { "name": "Assertion AI", "url": "https://assertion-ai.com" },
+  "license": "Apache-2.0",
+  "_comment": "Codex plugin manifest. Codex loads lifecycle hooks ONLY from an installed+enabled plugin cache (or an interactive TUI config layer) — NOT from loose files and NOT under `codex exec`. The hooks.json here is the SAME shape as the Claude Code plugin and points at the SAME shared scripts in ../scripts (one copy of the logic). Install path: `codex plugin marketplace add <repo-root>` then enable `assertion-memory` from `/plugins` in an interactive Codex session.",
+  "hooks": "./hooks.json",
+  "interface": {
+    "displayName": "Assertion memory",
+    "shortDescription": "Persistent project memory across sessions and agents.",
+    "category": "Productivity",
+    "capabilities": ["Interactive", "Write"]
+  }
+}

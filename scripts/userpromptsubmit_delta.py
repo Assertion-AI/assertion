@@ -61,9 +61,11 @@ def _expand(node_id: str):
 def main() -> int:
     try:
         session_id = "default"
+        prompt = ""
         try:
             payload = json.loads(sys.stdin.read() or "{}")
             session_id = payload.get("session_id") or "default"
+            prompt = payload.get("prompt") or ""   # stashed below as Codex's Stop user_text
         except Exception:
             pass
         if not _BASE or not _KEY:
@@ -159,10 +161,12 @@ def main() -> int:
                 "prior turns may have made these). Treat as background you now know.\n\n"
                 + "\n".join(lines) + "\n</assertion_memory_updates>")
 
-        # persist state for Stop hook (focus) + next prompt (cursor, lenses)
+        # persist state for Stop hook (focus + prompt) and next prompt (cursor, lenses).
+        # `prompt` is read by the Stop hook as Codex's user_text (harmless/unused on Claude).
         try:
             with open(sp, "w") as f:
-                json.dump({"last_seen_turn": current, "focus": focus, "lenses": lenses}, f)
+                json.dump({"last_seen_turn": current, "focus": focus,
+                           "lenses": lenses, "prompt": prompt}, f)
         except Exception:
             pass
 
