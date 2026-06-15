@@ -25,11 +25,12 @@ import tempfile
 import urllib.parse
 import urllib.request
 
-_BASE = (os.environ.get("ASSERTION_SERVER_URL") or os.environ.get("CONTEXT_TREE_SERVER_URL")
-         or "https://memory.assertion-ai.com").rstrip("/")
-_KEY = os.environ.get("ASSERTION_API_KEY") or os.environ.get("CONTEXT_TREE_API_KEY", "")
-_PREFIX = (os.environ.get("ASSERTION_PATH_PREFIX") or os.environ.get("CONTEXT_TREE_PATH_PREFIX") or "/memory").rstrip("/")
-_WS = os.environ.get("ASSERTION_WORKSPACE") or os.environ.get("CONTEXT_TREE_WORKSPACE") or "default"
+import _creds
+
+_BASE = _creds.server_url()
+_KEY = _creds.api_key()
+_PREFIX = _creds.path_prefix()
+_WS = _creds.workspace()
 
 
 def _state_path(session_id: str) -> str:

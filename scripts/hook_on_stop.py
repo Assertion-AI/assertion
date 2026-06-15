@@ -18,12 +18,11 @@ import sys
 import tempfile
 import urllib.request
 
-# Target defaults to PROD; one env var (ASSERTION_SERVER_URL) redirects all hooks to dev.
-_BASE = (os.environ.get("ASSERTION_SERVER_URL")
-         or os.environ.get("CONTEXT_TREE_SERVER_URL")
-         or "https://memory.assertion-ai.com").rstrip("/")
-_PREFIX = (os.environ.get("ASSERTION_PATH_PREFIX")
-           or os.environ.get("CONTEXT_TREE_PATH_PREFIX") or "/memory").rstrip("/")
+import _creds
+
+# Target defaults to PROD; ASSERTION_SERVER_URL (or the credentials file) redirects to dev.
+_BASE = _creds.server_url()
+_PREFIX = _creds.path_prefix()
 UPDATE_URL = (os.environ.get("ASSERTION_UPDATE_URL")
               or os.environ.get("CONTEXT_TREE_UPDATE_URL")
               or f"{_BASE}{_PREFIX}/update")
@@ -114,7 +113,7 @@ def main() -> int:
     if not user_text and not assistant_text:
         return 0
 
-    api_key = os.environ.get("ASSERTION_API_KEY") or os.environ.get("CONTEXT_TREE_API_KEY", "")
+    api_key = _creds.api_key()
     if not api_key:
         # Don't post unauthenticated (it would 401 and silently drop the turn).
         # Warn loudly so a misconfigured setup is visible, not a quietly empty tree.
@@ -132,8 +131,7 @@ def main() -> int:
     # Send the workspace header so the WRITE lands in the same workspace the reads use.
     # Without it the backend defaults to "default" — which would route a dev's captures
     # (ASSERTION_WORKSPACE=dev-<name>) into the prod tree even though their reads are isolated.
-    workspace = (os.environ.get("ASSERTION_WORKSPACE")
-                 or os.environ.get("CONTEXT_TREE_WORKSPACE") or "default")
+    workspace = _creds.workspace()
     headers = {"Content-Type": "application/json", "x-api-key": api_key,
                "X-Assertion-Workspace": workspace}
     req = urllib.request.Request(UPDATE_URL, data=body, headers=headers, method="POST")

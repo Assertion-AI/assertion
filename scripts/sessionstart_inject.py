@@ -18,6 +18,8 @@ import os
 import sys
 import urllib.request
 
+import _creds
+
 
 def main() -> int:
     try:
@@ -26,17 +28,13 @@ def main() -> int:
         except Exception:
             pass
 
-        base = (os.environ.get("ASSERTION_SERVER_URL")
-                or os.environ.get("CONTEXT_TREE_SERVER_URL")
-                or "https://memory.assertion-ai.com").rstrip("/")
-        key = os.environ.get("ASSERTION_API_KEY") or os.environ.get("CONTEXT_TREE_API_KEY", "")
+        base = _creds.server_url()
+        key = _creds.api_key()
         if not base or not key:
             return 0
 
-        prefix = (os.environ.get("ASSERTION_PATH_PREFIX")
-                  or os.environ.get("CONTEXT_TREE_PATH_PREFIX") or "/memory").rstrip("/")
-        workspace = (os.environ.get("ASSERTION_WORKSPACE")
-                     or os.environ.get("CONTEXT_TREE_WORKSPACE") or "default")
+        prefix = _creds.path_prefix()
+        workspace = _creds.workspace()
         url = f"{base}{prefix}/working-set"
 
         req = urllib.request.Request(url, headers={"x-api-key": key, "X-Assertion-Workspace": workspace})

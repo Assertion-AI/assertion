@@ -24,13 +24,14 @@ On first use Codex shows a **Trust** dialog listing the SessionStart/UserPromptS
 hooks — toggle each on. That's required once; afterwards the hooks run automatically (in
 the terminal CLI and in the VS Code Codex panel alike).
 
-Set your key so the hooks and MCP can authenticate:
+Set your key once — this works in **both** the CLI and the VS Code extension (GUI hosts
+don't pass your shell environment to hooks, so the key goes in a file, not `export`):
 ```bash
-export ASSERTION_API_KEY="<your key>"
+mkdir -p ~/.assertion && echo '{"api_key":"<your key>"}' > ~/.assertion/credentials.json
 ```
-
-Add the MCP server (for `recall`/`expand`) from `config.toml.example` to
-`~/.codex/config.toml`.
+The hooks read the key from that file. Then add the MCP server (for `recall`/`expand`)
+from `config.toml.example` to `~/.codex/config.toml` — it carries the same key as a literal
+`bearer_token`, so it also works without env.
 
 ## Verify
 - `recall` returns nodes from your `default` tree (the same memory you see elsewhere).

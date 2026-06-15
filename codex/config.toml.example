@@ -1,8 +1,13 @@
 # Assertion memory for OpenAI Codex — add to ~/.codex/config.toml.
 #
 # Defaults to PROD (memory.assertion-ai.com) and the shared `default` workspace — the
-# same tree you use everywhere else. You only need ASSERTION_API_KEY.
-# To point one machine at dev instead, override locally (see the commented lines).
+# same tree you use everywhere else.
+#
+# One-time key setup (works in BOTH the CLI and the VS Code extension):
+#   1. The hooks read the key from a credentials file (GUI hosts don't pass shell env):
+#        mkdir -p ~/.assertion && echo '{"api_key":"<your key>"}' > ~/.assertion/credentials.json
+#   2. The MCP block below carries the key as a literal `bearer_token` (also env-free).
+# (CLI-only users may instead export ASSERTION_API_KEY and use bearer_token_env_var.)
 
 # --- recall / expand tools (MCP) ---------------------------------------------
 # Codex's HTTP MCP only supports bearer-token auth and drops custom headers, so the
@@ -10,15 +15,16 @@
 # Authorization: Bearer. `default` is the shared tree.
 [mcp_servers.assertion]
 url = "https://memory.assertion-ai.com/memory/mcp/default"
-bearer_token_env_var = "ASSERTION_API_KEY"
+bearer_token = "<your key>"                 # literal → works in the IDE (no env needed)
+# CLI alternative: bearer_token_env_var = "ASSERTION_API_KEY"
 # Dev override: swap the url to
 #   https://auto-insight-product-dev-jbdf42voqq-uc.a.run.app/memory/mcp/<your-dev-workspace>
 
 # --- lifecycle hooks (capture + inject) --------------------------------------
 # Preferred: install the plugin (see README) and these come with it — skip this section.
-# The inline form below is a no-install fallback. The scripts default to PROD + `default`;
-# only ASSERTION_API_KEY is required. Set ASSERTION_SCRIPTS_DIR to the absolute path of
-# ../scripts so the commands resolve.
+# The inline form below is a no-install fallback. The scripts default to PROD + `default`
+# and read the key from ~/.assertion/credentials.json (above). Set ASSERTION_SCRIPTS_DIR
+# to the absolute path of ../scripts so the commands resolve.
 #
 # Dev override: prepend to each command below:
 #   ASSERTION_SERVER_URL='https://auto-insight-product-dev-jbdf42voqq-uc.a.run.app' ASSERTION_WORKSPACE='<your-dev-workspace>'
@@ -27,14 +33,14 @@ bearer_token_env_var = "ASSERTION_API_KEY"
 matcher = "startup|resume|clear|compact"
 [[hooks.SessionStart.hooks]]
 type = "command"
-command = "ASSERTION_API_KEY='<your key>' python3 \"$ASSERTION_SCRIPTS_DIR/sessionstart_inject.py\""
+command = "python3 \"$ASSERTION_SCRIPTS_DIR/sessionstart_inject.py\""
 
 [[hooks.UserPromptSubmit]]
 [[hooks.UserPromptSubmit.hooks]]
 type = "command"
-command = "ASSERTION_API_KEY='<your key>' python3 \"$ASSERTION_SCRIPTS_DIR/userpromptsubmit_delta.py\""
+command = "python3 \"$ASSERTION_SCRIPTS_DIR/userpromptsubmit_delta.py\""
 
 [[hooks.Stop]]
 [[hooks.Stop.hooks]]
 type = "command"
-command = "ASSERTION_API_KEY='<your key>' python3 \"$ASSERTION_SCRIPTS_DIR/hook_on_stop.py\""
+command = "python3 \"$ASSERTION_SCRIPTS_DIR/hook_on_stop.py\""
