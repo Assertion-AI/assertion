@@ -3,23 +3,22 @@
 # Defaults to PROD (memory.assertion-ai.com) and the shared `default` workspace — the
 # same tree you use everywhere else.
 #
-# Key setup — two paths read the key two ways:
+# Key setup:
 #   1. Hooks (capture + inject) read a credentials file (works in CLI and VS Code; GUI
 #      hosts don't pass shell env):
 #        mkdir -p ~/.assertion && echo '{"api_key":"<your key>"}' > ~/.assertion/credentials.json
-#   2. MCP (recall/expand) reads the key from the ASSERTION_API_KEY *environment variable*.
-#      Codex's HTTP MCP supports ONLY bearer_token_env_var (a literal `bearer_token` is
-#      rejected for streamable_http). Provide the env var:
-#        - CLI: `export ASSERTION_API_KEY=...` in the shell you launch codex from.
-#        - VS Code: set ASSERTION_API_KEY in the Codex panel's Local-environment UI
-#          (env dropdown by the prompt box → Local → gear icon → add the var).
+#   2. MCP (recall/expand) takes the key from the [mcp_servers.assertion] block below.
+#      Use `http_headers` with a LITERAL bearer token — it lives in config.toml, so it
+#      works in BOTH the CLI and the VS Code extension with no shell env. (Verified on
+#      codex 0.139: a literal Authorization header authenticates; `bearer_token` is the
+#      one form Codex rejects for HTTP MCP — use http_headers, not bearer_token.)
 
 # --- recall / expand tools (MCP) ---------------------------------------------
-# Codex's HTTP MCP uses bearer-token auth from an env var (no literal key, no custom
-# headers), so the workspace goes in the URL path (/memory/mcp/<workspace>).
+# Workspace goes in the URL path (/memory/mcp/<workspace>); `default` is the shared tree.
 [mcp_servers.assertion]
 url = "https://memory.assertion-ai.com/memory/mcp/default"
-bearer_token_env_var = "ASSERTION_API_KEY"
+http_headers = { Authorization = "Bearer <your key>" }
+# CLI alternative (key from shell env instead of config): bearer_token_env_var = "ASSERTION_API_KEY"
 # Dev override: swap the url to
 #   https://auto-insight-product-dev-jbdf42voqq-uc.a.run.app/memory/mcp/<your-dev-workspace>
 

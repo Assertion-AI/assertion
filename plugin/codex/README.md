@@ -32,15 +32,17 @@ mkdir -p ~/.assertion && echo '{"api_key":"<your key>"}' > ~/.assertion/credenti
 ```
 The hooks read the key from that file → capture + inject work in CLI and IDE.
 
-**recall/expand tools:** the plugin ships a bearer-auth MCP server that reads the key from
-the `ASSERTION_API_KEY` **environment variable** (Codex's HTTP MCP supports only
-`bearer_token_env_var` — a literal key is rejected). So provide the env var:
-- **CLI:** `export ASSERTION_API_KEY=...` in the shell you launch `codex` from.
-- **VS Code:** set `ASSERTION_API_KEY` in the Codex panel's Local-environment UI (the env
-  dropdown by the prompt box → Local → gear icon → add the variable).
-
-(Capture + inject work in the IDE from the credentials file regardless — recall/expand is
-the only env-dependent extra.)
+**recall/expand tools:** add an MCP block to `~/.codex/config.toml` with a **literal**
+bearer token (from `config.toml.example`):
+```toml
+[mcp_servers.assertion]
+url = "https://memory.assertion-ai.com/memory/mcp/default"
+http_headers = { Authorization = "Bearer <your key>" }
+```
+Because the key is in `config.toml`, this works in **both the CLI and the VS Code extension**
+with no shell env — verified on codex 0.139 (a `recall` returned results). Use `http_headers`,
+not `bearer_token` (Codex rejects the latter for HTTP MCP). Capture + inject work from the
+credentials file regardless; this block only adds the recall/expand tools.
 
 ## Verify
 - `recall` returns nodes from your `default` tree (the same memory you see elsewhere).
