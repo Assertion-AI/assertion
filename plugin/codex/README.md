@@ -16,22 +16,27 @@ need an API key.
 - **`recall` / `expand` MCP tools** — query the tree on demand from inside Codex.
 
 ## Install (plugin — works in the Codex CLI and the VS Code extension)
+The whole plugin lives in this repo's root marketplace; add it and enable:
 ```bash
-codex plugin marketplace add /abs/path/to/assertion-plugin/codex
-codex            # then: /plugins → enable "assertion-memory"
+codex plugin marketplace add /abs/path/to/assertion-plugin
+codex plugin add assertion@assertion-ai      # or: codex → /plugins → enable "assertion"
 ```
 On first use Codex shows a **Trust** dialog listing the SessionStart/UserPromptSubmit/Stop
-hooks — toggle each on. That's required once; afterwards the hooks run automatically (in
-the terminal CLI and in the VS Code Codex panel alike).
+hooks — toggle each on. That's required once; afterwards the hooks run automatically, in
+the terminal CLI and the VS Code Codex panel alike.
 
-Set your key once — this works in **both** the CLI and the VS Code extension (GUI hosts
-don't pass your shell environment to hooks, so the key goes in a file, not `export`):
+Set your key once (GUI hosts don't pass your shell environment to hooks, so the key goes
+in a file, not `export`):
 ```bash
 mkdir -p ~/.assertion && echo '{"api_key":"<your key>"}' > ~/.assertion/credentials.json
 ```
-The hooks read the key from that file. Then add the MCP server (for `recall`/`expand`)
-from `config.toml.example` to `~/.codex/config.toml` — it carries the same key as a literal
-`bearer_token`, so it also works without env.
+The hooks read the key from that file → capture + inject work in CLI and IDE.
+
+**recall/expand tools:** the plugin ships a bearer-auth MCP server that reads the key from
+`ASSERTION_API_KEY` — so the tools work in the **CLI** (export the key in your shell). In
+the **VS Code extension** there's no shell env, so to use recall/expand there, add the
+literal-key MCP block from `config.toml.example` to `~/.codex/config.toml`. (Capture +
+inject work in the IDE regardless — recall/expand is the only env-dependent extra.)
 
 ## Verify
 - `recall` returns nodes from your `default` tree (the same memory you see elsewhere).

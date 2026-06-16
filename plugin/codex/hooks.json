@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          { "type": "command", "command": "python3 \"${ASSERTION_SCRIPTS_DIR:-${CLAUDE_PLUGIN_ROOT:-$PLUGIN_ROOT}/scripts}/sessionstart_inject.py\"" }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          { "type": "command", "command": "python3 \"${ASSERTION_SCRIPTS_DIR:-${CLAUDE_PLUGIN_ROOT:-$PLUGIN_ROOT}/scripts}/userpromptsubmit_delta.py\"" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "python3 \"${ASSERTION_SCRIPTS_DIR:-${CLAUDE_PLUGIN_ROOT:-$PLUGIN_ROOT}/scripts}/hook_on_stop.py\"" }
+        ]
+      }
+    ]
+  }
+}

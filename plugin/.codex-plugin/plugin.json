@@ -1,9 +1,11 @@
 {
   "name": "assertion",
+  "version": "0.1.9",
   "description": "Persistent memory for your coding agent \u2014 recall past work and auto-capture each session into a shared, project-scoped memory. By Assertion AI.",
-  "version": "0.1.8",
   "author": {
     "name": "Assertion AI",
     "url": "https://assertion-ai.com"
-  }
+  },
+  "hooks": "./codex/hooks.json",
+  "mcpServers": "./codex/mcp.json"
 }
