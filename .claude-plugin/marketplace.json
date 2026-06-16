@@ -1,12 +1,15 @@
 {
   "name": "assertion-ai",
-  "owner": { "name": "Assertion AI", "url": "https://assertion-ai.com" },
+  "owner": {
+    "name": "Assertion AI",
+    "url": "https://assertion-ai.com"
+  },
   "plugins": [
     {
       "name": "assertion",
-      "version": "0.1.9",
+      "version": "0.1.10",
       "source": "./plugin",
-      "description": "Persistent memory for coding agents — recall + auto-capture across sessions, project-scoped."
+      "description": "Persistent memory for coding agents \u2014 recall + auto-capture across sessions, project-scoped."
     }
   ]
 }
