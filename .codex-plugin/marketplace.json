@@ -1,14 +1,22 @@
 {
   "name": "assertion-ai",
-  "interface": { "displayName": "Assertion" },
+  "interface": {
+    "displayName": "Assertion"
+  },
   "plugins": [
     {
       "name": "assertion",
-      "version": "0.1.10",
-      "source": { "source": "local", "path": "./plugin" },
-      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "version": "0.1.11",
+      "source": {
+        "source": "local",
+        "path": "./plugin"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
       "category": "Productivity",
-      "description": "Persistent memory for coding agents — recall + auto-capture across sessions."
+      "description": "Persistent memory for coding agents \u2014 recall + auto-capture across sessions."
     }
   ]
 }

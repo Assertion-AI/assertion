@@ -7,7 +7,7 @@
   "plugins": [
     {
       "name": "assertion",
-      "version": "0.1.10",
+      "version": "0.1.11",
       "source": "./plugin",
       "description": "Persistent memory for coding agents \u2014 recall + auto-capture across sessions, project-scoped."
     }

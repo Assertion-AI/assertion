@@ -2,7 +2,7 @@
   "mcpServers": {
     "assertion": {
       "type": "http",
-      "url": "https://memory.assertion-ai.com/memory/mcp",
+      "url": "${ASSERTION_SERVER_URL:-https://memory.assertion-ai.com}/memory/mcp",
       "headers": {
         "x-api-key": "${ASSERTION_API_KEY}",
         "X-Assertion-Workspace": "${ASSERTION_WORKSPACE:-default}"
