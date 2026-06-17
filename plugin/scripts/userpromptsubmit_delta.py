@@ -59,11 +59,43 @@ def _expand(node_id: str):
         return []
 
 
+# Cursor has no per-prompt context-injection channel (beforeSubmitPrompt can only
+# permit/block), so — like claude-mem — we deliver the attention-lens deltas by writing
+# a Cursor Rules file the agent auto-loads. It's refreshed every prompt and accumulates
+# the session's lens updates (the working-set base still rides sessionStart additionalContext).
+_RULES_MAX_CHARS = 12000
+
+
+def _write_cursor_rules(project_dir: str, sections_accum: list) -> None:
+    if not project_dir or not sections_accum:
+        return
+    try:
+        rdir = os.path.join(project_dir, ".cursor", "rules")
+        os.makedirs(rdir, exist_ok=True)
+        body = "\n\n".join(sections_accum).strip()
+        if len(body) > _RULES_MAX_CHARS:
+            body = body[-_RULES_MAX_CHARS:]
+        doc = (
+            "---\n"
+            "description: Assertion project memory — live updates for your current work\n"
+            "alwaysApply: true\n"
+            "---\n"
+            "Live updates from the shared project-memory tree, refreshed as you work. "
+            "Treat as background you already know; cite node ids like [n0042].\n\n"
+            + body + "\n"
+        )
+        with open(os.path.join(rdir, "assertion-memory.mdc"), "w") as f:
+            f.write(doc)
+    except Exception:
+        pass
+
+
 def main() -> int:
     try:
         session_id = "default"
         prompt = ""
         is_cursor = False
+        project_dir = None
         try:
             payload = json.loads(sys.stdin.read() or "{}")
             # Cursor's beforeSubmitPrompt has no session_id — it keys turns by conversation_id;
@@ -73,6 +105,10 @@ def main() -> int:
             # Detect Cursor ONLY by `cursor_version` (Cursor-exclusive, always present) so this
             # can't misfire on a Claude/Codex prompt payload.
             is_cursor = bool(payload.get("cursor_version"))
+            # Cursor Rules files are project-scoped; find the project root for the rules write.
+            project_dir = ((payload.get("workspace_roots") or [None])[0]
+                           or os.environ.get("CURSOR_PROJECT_DIR")
+                           or os.environ.get("CLAUDE_PROJECT_DIR"))
         except Exception:
             pass
         if not _BASE or not _KEY:
@@ -168,20 +204,30 @@ def main() -> int:
                 "prior turns may have made these). Treat as background you now know.\n\n"
                 + "\n".join(lines) + "\n</assertion_memory_updates>")
 
+        # On Cursor, accumulate this turn's lens sections across the session so the rules file
+        # is a growing snapshot (Cursor re-reads it whole each prompt), bounded by char cap.
+        accum = (state.get("cursor_sections") or []) if is_cursor else []
+        if is_cursor and sections:
+            accum = (accum + sections)[-25:]
+
         # persist state for Stop hook (focus + prompt) and next prompt (cursor, lenses).
         # `prompt` is read by the Stop hook as Codex's user_text (harmless/unused on Claude).
         try:
             with open(sp, "w") as f:
-                json.dump({"last_seen_turn": current, "focus": focus,
-                           "lenses": lenses, "prompt": prompt}, f)
+                st = {"last_seen_turn": current, "focus": focus, "lenses": lenses, "prompt": prompt}
+                if is_cursor:
+                    st["cursor_sections"] = accum
+                json.dump(st, f)
         except Exception:
             pass
 
-        # Cursor's beforeSubmitPrompt can only permit/block — it has no channel to inject
-        # context (no additionalContext / updated_prompt), so we DON'T emit the lens delta there.
-        # We still ran the logic above to stash the prompt + maintain focus state for capture;
-        # on Cursor, mid-session orientation rides the sessionStart working-set injection instead.
-        if sections and not is_cursor:
+        # Inject the lens deltas. Claude Code/Codex take additionalContext via stdout. Cursor's
+        # beforeSubmitPrompt can't inject through stdout, so we write the deltas to a Cursor Rules
+        # file (auto-loaded, refreshed per prompt) and just permit the prompt.
+        if is_cursor:
+            _write_cursor_rules(project_dir, accum)
+            sys.stdout.write(json.dumps({"continue": True}))
+        elif sections:
             sys.stdout.write(json.dumps({"hookSpecificOutput": {
                 "hookEventName": "UserPromptSubmit", "additionalContext": "\n\n".join(sections)}}))
     except Exception:

@@ -9,9 +9,13 @@ your other Assertion-memory sessions read and write. You only need an API key.
 
 ## What you get
 - **sessionStart** — injects the working-set tree into the new conversation as context.
-- **beforeSubmitPrompt** — stashes your prompt so the turn can be captured.
+- **beforeSubmitPrompt** — stashes your prompt for capture, and writes the live attention-lens
+  (what changed, what you're zooming into) to a Cursor Rules file, `.cursor/rules/assertion-memory.mdc`,
+  refreshed every prompt. Cursor auto-loads that file, so the relevant memory follows your work.
 - **afterAgentResponse** — captures the turn `(prompt, response)` into the tree.
 - **`recall` / `expand` MCP tools** — query the tree on demand from inside Cursor.
+
+The rules file is generated — add `\.cursor/rules/assertion-memory.mdc` to your `.gitignore`.
 
 ## Install (one command)
 
