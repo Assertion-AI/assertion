@@ -1,10 +1,10 @@
 # Assertion — persistent memory for your coding agent
 
-Give **Claude Code** and **OpenAI Codex** a memory that persists across sessions: it
-**recalls** prior work and **auto-captures** each turn into a shared, project-scoped
-memory tree. Reads run over a hosted MCP endpoint (no local server); small hooks handle
-capture and context injection. One codebase serves both agents (single copy of the
-logic). By [Assertion AI](https://assertion-ai.com).
+Give **Claude Code**, **OpenAI Codex**, and **Cursor** a memory that persists across
+sessions: it **recalls** prior work and **auto-captures** each turn into a shared,
+project-scoped memory tree. Reads run over a hosted MCP endpoint (no local server);
+small hooks handle capture and context injection. One codebase serves all three agents
+(single copy of the logic). By [Assertion AI](https://assertion-ai.com).
 
 Get your key at https://assertion-ai.com. Requires a system `python3` (for the stdlib
 hooks) — no other deps.
@@ -56,6 +56,18 @@ mkdir -p ~/.assertion && echo '{"api_key":"<your key>"}' > ~/.assertion/credenti
 
 Capture + injection then work against the same shared tree, in CLI and VS Code. Full
 Codex details (recall/expand setup, dev override): [plugin/codex/README.md](plugin/codex/README.md).
+
+## Install — Cursor
+
+Cursor uses its own `hooks.json` + `mcp.json` (it has no plugin marketplace), so install
+is a short manual copy. Full steps: [plugin/cursor/README.md](plugin/cursor/README.md).
+
+```bash
+# drop your key (Cursor runs hooks without your shell env, so it goes in a file)
+mkdir -p ~/.assertion && echo '{"api_key":"<your key>"}' > ~/.assertion/credentials.json
+```
+Then copy `plugin/cursor/hooks.json` into `.cursor/hooks.json` (replacing the absolute
+scripts path), merge `plugin/cursor/mcp.json` into `~/.cursor/mcp.json`, and reload Cursor.
 
 ## What's included
 

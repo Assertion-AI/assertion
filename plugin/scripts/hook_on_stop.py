@@ -95,14 +95,20 @@ def main() -> int:
     except json.JSONDecodeError:
         return 0
 
-    sid = payload.get("session_id")
+    # Cursor keys turns by conversation_id (no session_id); fall back so the state file written
+    # by the prompt hook is found.
+    sid = payload.get("session_id") or payload.get("conversation_id")
 
-    # Platform detection by input shape — one set of scripts serves Claude Code AND Codex:
-    #   Codex's Stop hook provides `last_assistant_message` directly (and no prompt), so we
-    #   pair it with the prompt the UserPromptSubmit hook stashed in session state.
-    #   Claude Code's Stop has no `last_assistant_message`; we walk the transcript for both.
+    # Platform detection by input shape — one set of scripts serves Claude Code, Codex AND Cursor:
+    #   Codex's Stop hook provides `last_assistant_message` (and no prompt); Cursor's
+    #   afterAgentResponse provides `text` (and no prompt) — both are paired with the prompt the
+    #   prompt-submit hook stashed in session state. Claude Code's Stop has neither; we walk the
+    #   transcript for both halves of the turn.
     if payload.get("last_assistant_message") is not None:
         assistant_text = payload.get("last_assistant_message") or ""
+        user_text = _read_state(sid).get("prompt") or ""
+    elif payload.get("text") is not None:
+        assistant_text = payload.get("text") or ""
         user_text = _read_state(sid).get("prompt") or ""
     else:
         transcript_path = payload.get("transcript_path")

@@ -23,10 +23,13 @@ import _creds
 
 def main() -> int:
     try:
+        payload = {}
         try:
-            sys.stdin.read()
+            raw = sys.stdin.read()
+            if raw:
+                payload = json.loads(raw) or {}
         except Exception:
-            pass
+            payload = {}
 
         base = _creds.server_url()
         key = _creds.api_key()
@@ -52,7 +55,13 @@ def main() -> int:
             + text
             + "\n</persistent_project_memory>"
         )
-        out = {"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": context}}
+        # Cursor's sessionStart expects a top-level {"additional_context": ...}; Claude Code
+        # and Codex expect the nested hookSpecificOutput shape. Detect Cursor by its payload.
+        is_cursor = bool(payload.get("cursor_version")) or payload.get("hook_event_name") == "sessionStart"
+        if is_cursor:
+            out = {"additional_context": context}
+        else:
+            out = {"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": context}}
         sys.stdout.write(json.dumps(out))
     except Exception:
         return 0  # fail-open

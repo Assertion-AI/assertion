@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      { "command": "python3 \"/ABSOLUTE/PATH/TO/assertion-plugin/plugin/scripts/sessionstart_inject.py\"" }
+    ],
+    "beforeSubmitPrompt": [
+      { "command": "python3 \"/ABSOLUTE/PATH/TO/assertion-plugin/plugin/scripts/userpromptsubmit_delta.py\"" }
+    ],
+    "afterAgentResponse": [
+      { "command": "python3 \"/ABSOLUTE/PATH/TO/assertion-plugin/plugin/scripts/hook_on_stop.py\"" }
+    ]
+  }
+}

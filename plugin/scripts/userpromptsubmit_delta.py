@@ -63,10 +63,14 @@ def main() -> int:
     try:
         session_id = "default"
         prompt = ""
+        is_cursor = False
         try:
             payload = json.loads(sys.stdin.read() or "{}")
-            session_id = payload.get("session_id") or "default"
-            prompt = payload.get("prompt") or ""   # stashed below as Codex's Stop user_text
+            # Cursor's beforeSubmitPrompt has no session_id — it keys turns by conversation_id;
+            # both this hook and the capture hook fall back to it so their state files match.
+            session_id = payload.get("session_id") or payload.get("conversation_id") or "default"
+            prompt = payload.get("prompt") or ""   # stashed below as the capture hook's user_text
+            is_cursor = bool(payload.get("cursor_version")) or payload.get("hook_event_name") == "beforeSubmitPrompt"
         except Exception:
             pass
         if not _BASE or not _KEY:
@@ -171,7 +175,11 @@ def main() -> int:
         except Exception:
             pass
 
-        if sections:
+        # Cursor's beforeSubmitPrompt can only permit/block — it has no channel to inject
+        # context (no additionalContext / updated_prompt), so we DON'T emit the lens delta there.
+        # We still ran the logic above to stash the prompt + maintain focus state for capture;
+        # on Cursor, mid-session orientation rides the sessionStart working-set injection instead.
+        if sections and not is_cursor:
             sys.stdout.write(json.dumps({"hookSpecificOutput": {
                 "hookEventName": "UserPromptSubmit", "additionalContext": "\n\n".join(sections)}}))
     except Exception:
