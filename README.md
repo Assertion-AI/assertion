@@ -59,15 +59,17 @@ Codex details (recall/expand setup, dev override): [plugin/codex/README.md](plug
 
 ## Install — Cursor
 
-Cursor uses its own `hooks.json` + `mcp.json` (it has no plugin marketplace), so install
-is a short manual copy. Full steps: [plugin/cursor/README.md](plugin/cursor/README.md).
+Cursor has no plugin marketplace, so it installs via a one-time script that wires its
+`hooks.json` + `mcp.json` for you:
 
 ```bash
-# drop your key (Cursor runs hooks without your shell env, so it goes in a file)
-mkdir -p ~/.assertion && echo '{"api_key":"<your key>"}' > ~/.assertion/credentials.json
+git clone https://github.com/Assertion-AI/assertion
+cd assertion/plugin/cursor && python3 install_cursor.py   # paste your key when prompted
 ```
-Then copy `plugin/cursor/hooks.json` into `.cursor/hooks.json` (replacing the absolute
-scripts path), merge `plugin/cursor/mcp.json` into `~/.cursor/mcp.json`, and reload Cursor.
+Then fully quit and reopen Cursor. The installer merges into any existing Cursor config
+(it won't touch your other hooks or MCP servers), backs up what it changes, and defaults
+to prod + the shared `default` workspace. Options (`--key`, `--workspace`, `--server`,
+`--uninstall`) and a manual fallback: [plugin/cursor/README.md](plugin/cursor/README.md).
 
 ## What's included
 
