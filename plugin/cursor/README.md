@@ -13,33 +13,32 @@ your other Assertion-memory sessions read and write. You only need an API key.
 - **afterAgentResponse** — captures the turn `(prompt, response)` into the tree.
 - **`recall` / `expand` MCP tools** — query the tree on demand from inside Cursor.
 
-## Install
+## Install (one command)
 
-**1. Set your API key.** Cursor runs hooks without your shell environment, so the key
-goes in a file (not `export`):
+From this directory, run the installer and paste your key when prompted:
 ```bash
-mkdir -p ~/.assertion && echo '{"api_key":"<your key>"}' > ~/.assertion/credentials.json
+python3 install_cursor.py
 ```
+It writes your key to `~/.assertion/credentials.json`, adds the three hooks to
+`~/.cursor/hooks.json`, and adds the recall/expand MCP server to `~/.cursor/mcp.json` —
+merging into any existing Cursor config (it won't touch your other hooks or MCP servers)
+and backing up anything it changes. Get your key at https://assertion-ai.com.
 
-**2. Install the hooks.** Copy `cursor/hooks.json` into your project's `.cursor/hooks.json`
-(or `~/.cursor/hooks.json` to enable it for every project), and replace
-`/ABSOLUTE/PATH/TO/assertion-plugin/plugin/scripts` with the real path to this repo's
-`plugin/scripts` directory. The scripts are stdlib-only and run on the system `python3`.
+Then **fully quit and reopen Cursor** so it loads the hooks and MCP server. Approve the
+hooks if Cursor prompts to trust them.
 
-**3. Add the recall/expand tools (MCP).** Merge the `cursor/mcp.json` block into
-`~/.cursor/mcp.json` and replace `YOUR_API_KEY` with your key:
-```json
-{
-  "mcpServers": {
-    "assertion": {
-      "url": "https://memory.assertion-ai.com/memory/mcp/default",
-      "headers": { "Authorization": "Bearer YOUR_API_KEY" }
-    }
-  }
-}
-```
+Options: `--key <key>` (non-interactive), `--workspace <name>` (a different tree),
+`--server <url>` (a non-prod backend), `--uninstall` (remove what it added).
 
-**4. Reload Cursor.** Open a new chat — Cursor reads the hooks and the MCP server on start.
+<details><summary>Manual install (if you'd rather not run the script)</summary>
+
+1. Set your key (Cursor runs hooks without your shell env, so it goes in a file):
+   `mkdir -p ~/.assertion && echo '{"api_key":"<your key>"}' > ~/.assertion/credentials.json`
+2. Copy `hooks.json` into `~/.cursor/hooks.json`, replacing
+   `/ABSOLUTE/PATH/TO/assertion-plugin/plugin/scripts` with this repo's `plugin/scripts` path.
+3. Merge `mcp.json` into `~/.cursor/mcp.json`, replacing `YOUR_API_KEY`.
+4. Reload Cursor.
+</details>
 
 ## Verify
 - `recall` returns nodes from your `default` tree.
