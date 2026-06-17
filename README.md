@@ -71,8 +71,15 @@ scripts path), merge `plugin/cursor/mcp.json` into `~/.cursor/mcp.json`, and rel
 
 ## What's included
 
-- **MCP tools** (`recall`, `expand`, `evidence`, `conflicts`, `resolve`, `superseded`,
-  `unsupersede`) over `https://memory.assertion-ai.com`.
+- **MCP tools** — query and curate your memory from inside the agent, over
+  `https://memory.assertion-ai.com`:
+  - `recall` — find past work relevant to what you're doing now
+  - `expand` — open up a point to see the detail beneath it
+  - `evidence` — see the supporting detail behind a claim
+  - `conflicts` — surface where the record disagrees with itself
+  - `resolve` — settle a conflict and keep the memory coherent
+  - `superseded` — see what's been replaced as decisions changed
+  - `unsupersede` — bring back something that was replaced
 - **Stop hook** — captures each finished turn into the tree.
 - **SessionStart hook** — injects the project's working-set into context.
 
