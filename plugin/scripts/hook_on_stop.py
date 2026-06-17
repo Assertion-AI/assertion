@@ -107,7 +107,9 @@ def main() -> int:
     if payload.get("last_assistant_message") is not None:
         assistant_text = payload.get("last_assistant_message") or ""
         user_text = _read_state(sid).get("prompt") or ""
-    elif payload.get("text") is not None:
+    elif payload.get("cursor_version") is not None:
+        # Cursor's afterAgentResponse: assistant text in `text`, prompt from stashed state.
+        # Keyed on cursor_version (Cursor-exclusive) so Codex/Claude never take this path.
         assistant_text = payload.get("text") or ""
         user_text = _read_state(sid).get("prompt") or ""
     else:

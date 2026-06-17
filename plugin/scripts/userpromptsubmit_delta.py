@@ -70,7 +70,9 @@ def main() -> int:
             # both this hook and the capture hook fall back to it so their state files match.
             session_id = payload.get("session_id") or payload.get("conversation_id") or "default"
             prompt = payload.get("prompt") or ""   # stashed below as the capture hook's user_text
-            is_cursor = bool(payload.get("cursor_version")) or payload.get("hook_event_name") == "beforeSubmitPrompt"
+            # Detect Cursor ONLY by `cursor_version` (Cursor-exclusive, always present) so this
+            # can't misfire on a Claude/Codex prompt payload.
+            is_cursor = bool(payload.get("cursor_version"))
         except Exception:
             pass
         if not _BASE or not _KEY:

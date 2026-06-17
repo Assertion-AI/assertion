@@ -56,8 +56,10 @@ def main() -> int:
             + "\n</persistent_project_memory>"
         )
         # Cursor's sessionStart expects a top-level {"additional_context": ...}; Claude Code
-        # and Codex expect the nested hookSpecificOutput shape. Detect Cursor by its payload.
-        is_cursor = bool(payload.get("cursor_version")) or payload.get("hook_event_name") == "sessionStart"
+        # and Codex expect the nested hookSpecificOutput shape. Detect Cursor ONLY by
+        # `cursor_version` — it's in every Cursor hook payload and never in Claude/Codex, so this
+        # can't false-positive and flip an existing agent into the wrong output shape.
+        is_cursor = bool(payload.get("cursor_version"))
         if is_cursor:
             out = {"additional_context": context}
         else:
