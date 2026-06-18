@@ -20,7 +20,7 @@ url = "https://memory.assertion-ai.com/memory/mcp/default"
 http_headers = { Authorization = "Bearer <your key>" }
 # CLI alternative (key from shell env instead of config): bearer_token_env_var = "ASSERTION_API_KEY"
 # Dev override: swap the url to
-#   https://auto-insight-product-dev-jbdf42voqq-uc.a.run.app/memory/mcp/<your-dev-workspace>
+#   https://<your-dev-backend-url>/memory/mcp/<your-dev-workspace>
 
 # --- lifecycle hooks (capture + inject) --------------------------------------
 # Preferred: install the plugin (see README) and these come with it — skip this section.
@@ -29,7 +29,7 @@ http_headers = { Authorization = "Bearer <your key>" }
 # to the absolute path of ../scripts so the commands resolve.
 #
 # Dev override: prepend to each command below:
-#   ASSERTION_SERVER_URL='https://auto-insight-product-dev-jbdf42voqq-uc.a.run.app' ASSERTION_WORKSPACE='<your-dev-workspace>'
+#   ASSERTION_SERVER_URL='https://<your-dev-backend-url>' ASSERTION_WORKSPACE='<your-dev-workspace>'
 
 [[hooks.SessionStart]]
 matcher = "startup|resume|clear|compact"
