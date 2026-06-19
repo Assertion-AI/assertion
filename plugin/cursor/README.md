@@ -28,8 +28,14 @@ It writes your key to `~/.assertion/credentials.json`, adds the three hooks to
 merging into any existing Cursor config (it won't touch your other hooks or MCP servers)
 and backing up anything it changes. Get your key at https://assertion-ai.com.
 
-Then **fully quit and reopen Cursor** so it loads the hooks and MCP server. Approve the
-hooks if Cursor prompts to trust them.
+Then finish in Cursor:
+
+1. **Fully quit and reopen Cursor** so it loads the hooks and MCP server.
+2. **Enable the MCP server.** Cursor doesn't auto-activate servers added to `mcp.json` — open
+   **Settings → Tools / MCP** (newer Cursor may also list it under **Plugins → Add Plugins**),
+   find **`assertion`**, and click **Get / Enable**. This turns on the `recall`/`expand` tools.
+3. **Approve the hooks** if Cursor prompts to trust them. ⚠️ The hooks are what actually
+   **capture** turns and **inject** memory — enabling only the MCP server is not enough.
 
 Options: `--key <key>` (non-interactive), `--workspace <name>` (a different tree),
 `--server <url>` (a non-prod backend), `--uninstall` (remove what it added).
@@ -45,6 +51,7 @@ Options: `--key <key>` (non-interactive), `--workspace <name>` (a different tree
 </details>
 
 ## Verify
+- In Cursor's MCP/Tools settings, `assertion` shows as **enabled** with its tools listed.
 - `recall` returns nodes from your `default` tree.
 - Make a decision in one session; start a new one and ask about it — the agent answers
   from memory without you re-stating it.
