@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "assertion": {
+      "url": "https://memory.assertion-ai.com/memory/mcp/default",
+      "headers": {
+        "Authorization": "Bearer ${ASSERTION_API_KEY}"
+      }
+    }
+  }
+}
