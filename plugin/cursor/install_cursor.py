@@ -124,10 +124,12 @@ def install(key: str, server: str, workspace: str) -> None:
     _backup(CURSOR_MCP)
     _write_json(CURSOR_MCP, mcp)
 
-    print("\n✅ Installed. Next:")
+    print("\n✅ Config written. Finish in Cursor:")
     print("  1. Fully quit and reopen Cursor (it loads hooks + MCP on launch).")
-    print("  2. Approve the hooks if Cursor prompts to trust them.")
-    print("  3. In a chat, try: \"recall <a topic you've worked on>\" — it should answer from memory.")
+    print("  2. Enable the MCP server: open Settings → Tools / MCP (Cursor may also surface it")
+    print("     under \"Plugins → Add Plugins\"), find \"assertion\", and click Get / Enable.")
+    print("  3. Approve the hooks if Cursor prompts to trust them.")
+    print("  4. In a chat, try: \"recall <a topic you've worked on>\" — it should answer from memory.")
 
 
 def uninstall(server: str, workspace: str) -> None:
