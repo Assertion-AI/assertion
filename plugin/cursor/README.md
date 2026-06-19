@@ -28,14 +28,14 @@ It writes your key to `~/.assertion/credentials.json`, adds the three hooks to
 merging into any existing Cursor config (it won't touch your other hooks or MCP servers)
 and backing up anything it changes. Get your key at https://assertion-ai.com.
 
-Then finish in Cursor:
+Then **fully quit and reopen Cursor** — that's it. On launch Cursor loads what the script
+wrote: the `assertion` server appears under **Settings → Tools & MCPs**, and the hooks
+(capture + memory injection) run automatically. There's **no extra "enable" or "Get" step** —
+just start working. (If Cursor prompts to trust the hooks, approve them.)
 
-1. **Fully quit and reopen Cursor** so it loads the hooks and MCP server.
-2. **Enable the MCP server.** Cursor doesn't auto-activate servers added to `mcp.json` — open
-   **Settings → Tools / MCP** (newer Cursor may also list it under **Plugins → Add Plugins**),
-   find **`assertion`**, and click **Get / Enable**. This turns on the `recall`/`expand` tools.
-3. **Approve the hooks** if Cursor prompts to trust them. ⚠️ The hooks are what actually
-   **capture** turns and **inject** memory — enabling only the MCP server is not enough.
+> Note: ignore any **`assertion`** entry in Cursor's **plugin catalog** (the "Get" button) —
+> that's a separate, auto-discovered install in a different format. The script above is the
+> supported Cursor path.
 
 Options: `--key <key>` (non-interactive), `--workspace <name>` (a different tree),
 `--server <url>` (a non-prod backend), `--uninstall` (remove what it added).
