@@ -134,6 +134,13 @@ def main() -> int:
 
         sections: list[str] = []
         first_run = last is None
+        # For the visible per-prompt banner (CLI terminal renders systemMessage; VS Code ignores
+        # it — harmless). We surface only SUBSTANCE the user didn't have — the actual claims that
+        # changed since they last worked here, and new-workstream re-orientation — NOT plumbing
+        # (zoom/invalidate just feed the model detail; they're not news to the user). Tracked
+        # alongside the existing injection logic, so what gets injected (and the cache) is untouched.
+        update_claims: list[str] = []   # AWARENESS: human-readable L1/L2 cross-session changes
+        rebaselined = False             # RE-BASELINE: new workstream
 
         # focus = deepest most-recent active change FROM THIS SESSION (else keep prior).
         # Sourcing from own-session writes only is what stops a concurrent session's deep
@@ -188,12 +195,17 @@ def main() -> int:
                     sections.append(
                         "<assertion_rebaseline>\nNew workstream detected — re-orienting. "
                         "Current high-level map:\n\n" + ws_md.strip() + "\n</assertion_rebaseline>")
+                    rebaselined = True
             except Exception:
                 pass
 
         # ---- A. AWARENESS: L1/L2 changes since last sync ----
         sig = [c for c in changed if c.get("level") in (1, 2)]
         if not first_run and sig:
+            # Stash (id, claim) for the visible banner — substance with a verifiable handle the
+            # user can act on ("expand [n0269]"), mirroring the session-start recap. Not a count.
+            update_claims = [(c["id"], c["claim"]) for c in sig
+                             if c.get("status") == "active" and c.get("claim")]
             lines = []
             for c in sig:
                 tag = "" if c.get("status") == "active" else "/superseded"
@@ -228,8 +240,23 @@ def main() -> int:
             _write_cursor_rules(project_dir, accum)
             sys.stdout.write(json.dumps({"continue": True}))
         elif sections:
-            sys.stdout.write(json.dumps({"hookSpecificOutput": {
-                "hookEventName": "UserPromptSubmit", "additionalContext": "\n\n".join(sections)}}))
+            out = {"hookSpecificOutput": {
+                "hookEventName": "UserPromptSubmit", "additionalContext": "\n\n".join(sections)}}
+            # Visible banner → SUBSTANCE only: the actual changes the user didn't have (cross-session
+            # claims, new workstream). Not a counter, not plumbing. Renders in the Claude Code
+            # terminal; the VS Code GUI ignores systemMessage (harmless no-op). Silent when the only
+            # thing that happened was zoom/invalidate (model-detail loading — no news to the user).
+            if update_claims:
+                shown = update_claims[:3]
+                body = "\n".join(
+                    f"  • [{nid}] {cl if len(cl) <= 110 else cl[:107] + '…'}" for nid, cl in shown)
+                more = len(update_claims) - len(shown)
+                if more > 0:
+                    body += f"\n  • …and {more} more"
+                out["systemMessage"] = "🌳 Updated since you last worked here:\n" + body
+            elif rebaselined:
+                out["systemMessage"] = "🌳 New workstream detected — re-oriented to the current project map."
+            sys.stdout.write(json.dumps(out))
     except Exception:
         return 0  # fail-open
     return 0

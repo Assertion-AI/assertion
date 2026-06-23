@@ -1,7 +1,7 @@
 {
   "name": "assertion",
   "description": "Persistent memory for your coding agent \u2014 recall past work and auto-capture each session into a shared, project-scoped memory. By Assertion AI.",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "author": {
     "name": "Assertion AI",
     "url": "https://assertion-ai.com"
