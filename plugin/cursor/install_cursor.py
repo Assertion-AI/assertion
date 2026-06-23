@@ -31,6 +31,7 @@ HOME = os.path.expanduser("~")
 CREDS = os.path.join(HOME, ".assertion", "credentials.json")
 CURSOR_HOOKS = os.path.join(HOME, ".cursor", "hooks.json")
 CURSOR_MCP = os.path.join(HOME, ".cursor", "mcp.json")
+CURSOR_COMMANDS = os.path.join(HOME, ".cursor", "commands")
 PROD = "https://memory.assertion-ai.com"
 SCRIPT_NAMES = ("sessionstart_inject.py", "userpromptsubmit_delta.py", "hook_on_stop.py")
 
@@ -124,12 +125,20 @@ def install(key: str, server: str, workspace: str) -> None:
     _backup(CURSOR_MCP)
     _write_json(CURSOR_MCP, mcp)
 
+    # 4) /catchup slash command — copy our command into the global Cursor commands dir.
+    src_cmd = os.path.join(os.path.dirname(os.path.abspath(__file__)), "commands", "catchup.md")
+    if os.path.exists(src_cmd):
+        os.makedirs(CURSOR_COMMANDS, exist_ok=True)
+        shutil.copy2(src_cmd, os.path.join(CURSOR_COMMANDS, "catchup.md"))
+        print(f"  wrote {os.path.join(CURSOR_COMMANDS, 'catchup.md')}")
+
     print("\n✅ Installed. Just:")
     print("  1. Fully quit and reopen Cursor (it loads the hooks + MCP server on launch).")
     print("  2. Start working — that's it. The 'assertion' server shows under Settings → Tools & MCPs,")
     print("     and capture + memory injection run automatically (no enable/Get step).")
     print("     If Cursor asks you to trust the hooks, approve them.")
     print("  Verify anytime: ask \"recall <a topic you've worked on>\".")
+    print("  Tip: type /catchup (optionally with a topic or node id) for a grounded catch-up.")
 
 
 def uninstall(server: str, workspace: str) -> None:
@@ -155,6 +164,10 @@ def uninstall(server: str, workspace: str) -> None:
         del mcp["mcpServers"]["assertion"]
         _backup(CURSOR_MCP)
         _write_json(CURSOR_MCP, mcp)
+    cmd_path = os.path.join(CURSOR_COMMANDS, "catchup.md")
+    if os.path.exists(cmd_path):
+        os.remove(cmd_path)
+        print(f"  removed {cmd_path}")
     print("\n✅ Removed Assertion hooks + MCP server from Cursor config. "
           "Your key in ~/.assertion/credentials.json was left in place; delete it manually if you want.")
 

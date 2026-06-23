@@ -12,6 +12,9 @@
 #      works in BOTH the CLI and the VS Code extension with no shell env. (Verified on
 #      codex 0.139: a literal Authorization header authenticates; `bearer_token` is the
 #      one form Codex rejects for HTTP MCP — use http_headers, not bearer_token.)
+#   3. /catchup slash command (optional) — copy the bundled prompt so Codex offers it:
+#        mkdir -p ~/.codex/prompts && cp ../codex/prompts/catchup.md ~/.codex/prompts/
+#      Then type `/catchup` (optionally with a topic or node id) for a grounded catch-up.
 
 # --- recall / expand tools (MCP) ---------------------------------------------
 # Workspace goes in the URL path (/memory/mcp/<workspace>); `default` is the shared tree.
