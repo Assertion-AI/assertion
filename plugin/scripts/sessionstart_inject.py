@@ -64,21 +64,6 @@ def main() -> int:
             out = {"additional_context": context}
         else:
             out = {"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": context}}
-            # Visible recap → rendered to the USER via `systemMessage` (the working set above only
-            # reaches the model's context, invisibly). Skip on `compact` (mid-work — don't
-            # interrupt); show on startup/resume/clear. Fail-open: any error just omits the recap.
-            src = (payload.get("source") or "").lower()
-            if src != "compact":
-                try:
-                    rreq = urllib.request.Request(
-                        f"{base}{prefix}/recap",
-                        headers={"x-api-key": key, "X-Assertion-Workspace": workspace})
-                    with urllib.request.urlopen(rreq, timeout=10) as rresp:
-                        recap = rresp.read().decode("utf-8", "replace").strip()
-                    if recap:
-                        out["systemMessage"] = recap
-                except Exception:
-                    pass
         sys.stdout.write(json.dumps(out))
     except Exception:
         return 0  # fail-open
