@@ -14,11 +14,37 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import subprocess
 import sys
 import tempfile
 import urllib.request
 
 import _creds
+
+
+def _detect_repo(cwd: str) -> str:
+    """Provenance: the codebase this turn happened in — the reliable 'same project' signal for coding
+    work (claims are semantically diverse but share one repo). Prefer the git remote (org/repo), else
+    the git toplevel dir name; empty if not a git repo. Best-effort, never blocks the turn."""
+    cwd = cwd or os.getcwd()
+    try:
+        url = subprocess.run(["git", "-C", cwd, "config", "--get", "remote.origin.url"],
+                             capture_output=True, text=True, timeout=2).stdout.strip()
+        if url:
+            url = re.sub(r"^git@[^:]+:", "", url)       # git@github.com:org/repo.git -> org/repo.git
+            url = re.sub(r"^https?://[^/]+/", "", url)   # https://github.com/org/repo.git -> org/repo.git
+            return re.sub(r"\.git$", "", url)
+    except Exception:
+        pass
+    try:
+        top = subprocess.run(["git", "-C", cwd, "rev-parse", "--show-toplevel"],
+                             capture_output=True, text=True, timeout=2).stdout.strip()
+        if top:
+            return os.path.basename(top)
+    except Exception:
+        pass
+    return ""
 
 # Target defaults to PROD; ASSERTION_SERVER_URL (or the credentials file) redirects to dev.
 _BASE = _creds.server_url()
@@ -135,6 +161,9 @@ def main() -> int:
     focus = _read_state(sid).get("focus")
     if focus:
         update["focus"] = focus      # anchor placement to where this session is working
+    repo = _detect_repo(payload.get("cwd") or os.getcwd())
+    if repo:
+        update["repo"] = repo        # provenance: route/group this turn's nodes by codebase
     body = json.dumps(update).encode()
     # Send the workspace header so the WRITE lands in the same workspace the reads use.
     # Without it the backend defaults to "default" — which would route a dev's captures
