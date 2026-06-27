@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Assertion memory UserPromptSubmit hook — the read side of the attention-following
-window. Every prompt, structurally (no lexical matching, no thresholds):
+window. Every prompt:
 
-  focus   = deepest, most-recently-changed node (max turn, depth tiebreak)   [where work lands]
   A. AWARENESS    — inject L1/L2 nodes changed since last sync (cross-session updates)
   B. INVALIDATE   — a changed node X refreshes any lens that is X or X's direct child (one hop);
                     re-fetch + re-append (supersedes the stale copy; append-only)
-  C. ZOOM-IN      — when focus is deep and not yet open, append its children (the next layer);
-                    the session accumulates deep context as you descend
+  C. RECALL       — PRIMARY: semantic search (/memory/search) on the user's actual prompt →
+                    ranked seeds + one-hop children (follows what you ASKED). Falls back to the
+                    write-following ZOOM-IN (focus = deepest most-recent node, show its layer)
+                    only when the search endpoint is unavailable/empty.
   RE-BASELINE     — a brand-new L1 (new workstream) → re-inject the L1/L2 map to re-orient
 
 All injected append-only (prompt cache stays warm). State in assertion_session_<sid>.json =
@@ -171,10 +172,34 @@ def main() -> int:
                         f"Updated detail under [{anchor}] (supersedes any earlier detail you saw for it):\n"
                         + "\n".join(lines) + "\n</assertion_lens_update>")
 
-        # ---- C. ZOOM-IN: anchor on the focus's PARENT and show its children (the layer focus
-        # lives in = focus + siblings). Works whether focus is a leaf or not; as you descend,
-        # each new layer you enter gets appended once. ----
-        if not first_run and focus_meta and focus_meta.get("level", 0) > 2:
+        # ---- C. PROMPT-DRIVEN RECALL (primary): semantic search on the user's actual prompt →
+        # ranked seeds (each with its one-hop children). This is the attention-following window
+        # following what you ASKED, not just where capture last wrote. Fires every prompt incl.
+        # the first; fail-open. Falls back to the write-following zoom below only if the search
+        # endpoint is unavailable (e.g. not yet deployed → 404) or returns nothing. ----
+        recall_injected = False
+        if prompt.strip():
+            try:
+                res = _get_json("/search?" + urllib.parse.urlencode({"q": prompt[:2000]}))
+                results = res.get("results") or []
+                if results:
+                    lines = []
+                    for r in results:
+                        lines.append(f"[{r['id']}] (L{r.get('level')}) {r['claim']}")
+                        for c in (r.get("children") or [])[:4]:
+                            lines.append(f"    └ [{c['id']}] {c['claim']}")
+                    sections.append(
+                        "<assertion_recall>\n"
+                        "Relevant prior memory for what you're working on (cite the ids you actually "
+                        "use; call recall/expand to go deeper):\n"
+                        + "\n".join(lines) + "\n</assertion_recall>")
+                    recall_injected = True
+            except Exception:
+                pass
+
+        # ---- C (fallback). ZOOM-IN write-following: anchor on the focus's PARENT and show its
+        # children. Only when prompt-driven recall didn't fire (endpoint absent/empty). ----
+        if not recall_injected and not first_run and focus_meta and focus_meta.get("level", 0) > 2:
             anc_path = focus_meta.get("ancestor_path") or []
             anchor = focus_meta.get("parent_id") or (anc_path[0] if anc_path else None)
             if anchor and anchor not in lenses:
