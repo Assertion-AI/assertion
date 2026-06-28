@@ -178,6 +178,8 @@ def main() -> int:
         # the first; fail-open. Falls back to the write-following zoom below only if the search
         # endpoint is unavailable (e.g. not yet deployed → 404) or returns nothing. ----
         recall_injected = False
+        recall_seeds: list = []   # (id, claim) of surfaced seeds, for the visible banner
+        recall_error = None       # set if /search FAILED — distinguishes false-silence from below-floor
         if prompt.strip():
             try:
                 res = _get_json("/search?" + urllib.parse.urlencode({"q": prompt[:2000]}))
@@ -194,8 +196,9 @@ def main() -> int:
                         "use; call recall/expand to go deeper):\n"
                         + "\n".join(lines) + "\n</assertion_recall>")
                     recall_injected = True
-            except Exception:
-                pass
+                    recall_seeds = [(r["id"], r.get("claim") or "") for r in results]
+            except Exception as e:
+                recall_error = (str(e) or "error")[:80]
 
         # ---- C (fallback). ZOOM-IN write-following: anchor on the focus's PARENT and show its
         # children. Only when prompt-driven recall didn't fire (endpoint absent/empty). ----
@@ -264,14 +267,29 @@ def main() -> int:
         if is_cursor:
             _write_cursor_rules(project_dir, accum)
             sys.stdout.write(json.dumps({"continue": True}))
-        elif sections:
-            out = {"hookSpecificOutput": {
-                "hookEventName": "UserPromptSubmit", "additionalContext": "\n\n".join(sections)}}
-            # Visible banner → SUBSTANCE only: the actual changes the user didn't have (cross-session
-            # claims, new workstream). Not a counter, not plumbing. Renders in the Claude Code
-            # terminal; the VS Code GUI ignores systemMessage (harmless no-op). Silent when the only
-            # thing that happened was zoom/invalidate (model-detail loading — no news to the user).
-            if update_claims:
+        else:
+            out = {}
+            if sections:
+                out["hookSpecificOutput"] = {
+                    "hookEventName": "UserPromptSubmit", "additionalContext": "\n\n".join(sections)}
+            # Visible banner (CLI renders systemMessage; VS Code GUI ignores it — harmless). Priority:
+            #   recall-fired  → the per-turn 'what memory am I using' signal (closes the observability gap)
+            #   recall-error  → distinguishes a FAILED search (false silence) from a real below-floor miss
+            #   awareness     → cross-session claims the user didn't have
+            #   rebaseline    → new workstream
+            # Silent on a genuine below-floor miss, so the mapping is unambiguous:
+            #   '🧠 recalled N' = fired · '⚠️ recall unavailable' = errored · (no banner) = nothing relevant.
+            if recall_seeds:
+                shown = recall_seeds[:3]
+                body = "\n".join(
+                    f"  • [{nid}] {cl if len(cl) <= 100 else cl[:97] + '…'}" for nid, cl in shown)
+                more = len(recall_seeds) - len(shown)
+                if more > 0:
+                    body += f"\n  • …and {more} more"
+                out["systemMessage"] = f"🧠 recalled {len(recall_seeds)} node(s) for this turn:\n" + body
+            elif recall_error:
+                out["systemMessage"] = f"⚠️ memory recall unavailable this turn ({recall_error})"
+            elif update_claims:
                 shown = update_claims[:3]
                 body = "\n".join(
                     f"  • [{nid}] {cl if len(cl) <= 110 else cl[:107] + '…'}" for nid, cl in shown)
@@ -281,7 +299,8 @@ def main() -> int:
                 out["systemMessage"] = "🌳 Updated since you last worked here:\n" + body
             elif rebaselined:
                 out["systemMessage"] = "🌳 New workstream detected — re-oriented to the current project map."
-            sys.stdout.write(json.dumps(out))
+            if out:
+                sys.stdout.write(json.dumps(out))
     except Exception:
         return 0  # fail-open
     return 0
