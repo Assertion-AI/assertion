@@ -19,6 +19,7 @@ Env: ASSERTION_API_KEY / ASSERTION_SERVER_URL (default https://memory.assertion-
 """
 from __future__ import annotations
 
+import concurrent.futures
 import json
 import os
 import sys
@@ -127,7 +128,15 @@ def main() -> int:
         lenses = state.get("lenses") or {}   # anchor_id -> ancestor_path
 
         qs = urllib.parse.urlencode({"since_turn": last if last is not None else 0, "levels": "all"})
-        data = _get_json("/working-set/delta?" + qs)
+        # Fork-join: /working-set/delta (cross-session deltas + focus) and /search (prompt-driven
+        # recall) share no inputs or outputs, so fire both concurrently — the per-prompt hook then
+        # waits ~max(delta, search) instead of the sum. Blocking urllib calls release the GIL during
+        # the network wait, so threads parallelize fine. stdlib-only (concurrent.futures).
+        _pool = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+        _search_fut = (_pool.submit(_get_json, "/search?" + urllib.parse.urlencode({"q": prompt[:2000]}))
+                       if prompt.strip() else None)
+        _delta_fut = _pool.submit(_get_json, "/working-set/delta?" + qs)
+        data = _delta_fut.result()   # delta failure propagates → outer try fails open (return 0)
         current = int(data.get("n_turns_processed", 0))
         changed = data.get("changed") or []
         active = [c for c in changed if c.get("status") == "active"]
@@ -180,9 +189,9 @@ def main() -> int:
         recall_injected = False
         recall_seeds: list = []   # (id, claim) of surfaced seeds, for the visible banner
         recall_error = None       # set if /search FAILED — distinguishes false-silence from below-floor
-        if prompt.strip():
+        if _search_fut is not None:
             try:
-                res = _get_json("/search?" + urllib.parse.urlencode({"q": prompt[:2000]}))
+                res = _search_fut.result()   # already in flight since the top (ran during delta)
                 results = res.get("results") or []
                 if results:
                     lines = []
@@ -199,6 +208,7 @@ def main() -> int:
                     recall_seeds = [(r["id"], r.get("claim") or "") for r in results]
             except Exception as e:
                 recall_error = (str(e) or "error")[:80]
+        _pool.shutdown(wait=False)   # both futures consumed (delta above, search here)
 
         # ---- C (fallback). ZOOM-IN write-following: anchor on the focus's PARENT and show its
         # children. Only when prompt-driven recall didn't fire (endpoint absent/empty). ----
