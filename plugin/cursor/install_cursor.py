@@ -33,7 +33,7 @@ CURSOR_HOOKS = os.path.join(HOME, ".cursor", "hooks.json")
 CURSOR_MCP = os.path.join(HOME, ".cursor", "mcp.json")
 CURSOR_COMMANDS = os.path.join(HOME, ".cursor", "commands")
 PROD = "https://memory.assertion-ai.com"
-SCRIPT_NAMES = ("sessionstart_inject.py", "userpromptsubmit_delta.py", "hook_on_stop.py")
+SCRIPT_NAMES = ("sessionstart_inject.py", "userpromptsubmit_delta.py", "hook_on_stop.py", "hook_on_compact.py")
 
 
 def _scripts_dir() -> str:
@@ -104,7 +104,8 @@ def install(key: str, server: str, workspace: str) -> None:
         hmap = {}
     for event, script in (("sessionStart", "sessionstart_inject.py"),
                           ("beforeSubmitPrompt", "userpromptsubmit_delta.py"),
-                          ("afterAgentResponse", "hook_on_stop.py")):
+                          ("afterAgentResponse", "hook_on_stop.py"),
+                          ("preCompact", "hook_on_compact.py")):
         lst = [e for e in (hmap.get(event) or []) if not _is_ours((e or {}).get("command", ""))]
         lst.append({"command": cmd(script)})
         hmap[event] = lst
@@ -146,7 +147,7 @@ def uninstall(server: str, workspace: str) -> None:
     hooks = _load_json(CURSOR_HOOKS)
     hmap = hooks.get("hooks") or {}
     changed = False
-    for event in ("sessionStart", "beforeSubmitPrompt", "afterAgentResponse"):
+    for event in ("sessionStart", "beforeSubmitPrompt", "afterAgentResponse", "preCompact"):
         if event in hmap:
             kept = [e for e in hmap[event] if not _is_ours((e or {}).get("command", ""))]
             if kept != hmap[event]:

@@ -16,9 +16,31 @@ from __future__ import annotations
 import json
 import os
 import sys
+import tempfile
+import time
 import urllib.request
 
 import _creds
+
+
+def _mark_compaction(sid) -> None:
+    """Append a wall-clock compaction ts to the session's marker file (read by the Stop hook → assist
+    log cross-segment). Same epoch clock as node.updated_at, so the backend can tell which assisted
+    facts predate the latest compaction. Separate file so the per-prompt state write can't clobber it.
+    Best-effort."""
+    if not sid:
+        return
+    try:
+        safe = "".join(c for c in str(sid) if c.isalnum() or c in "-_")[:64] or "default"
+        p = os.path.join(tempfile.gettempdir(), f"assertion_compaction_{safe}.json")
+        try:
+            comps = json.load(open(p)).get("compactions") or []
+        except Exception:
+            comps = []
+        comps.append(int(time.time()))
+        json.dump({"compactions": comps[-50:]}, open(p, "w"))
+    except Exception:
+        pass
 
 
 def main() -> int:
@@ -70,6 +92,8 @@ def main() -> int:
             # (mid-work — don't interrupt); show on startup/resume/clear. Fail-open: any error
             # just omits the recap, never the (cache-warm) additionalContext above.
             src = (payload.get("source") or "").lower()
+            if src == "compact":
+                _mark_compaction(payload.get("session_id"))   # Claude Code / Codex compaction event
             if src != "compact":
                 try:
                     rreq = urllib.request.Request(

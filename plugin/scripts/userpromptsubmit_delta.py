@@ -264,7 +264,8 @@ def main() -> int:
         # `prompt` is read by the Stop hook as Codex's user_text (harmless/unused on Claude).
         try:
             with open(sp, "w") as f:
-                st = {"last_seen_turn": current, "focus": focus, "lenses": lenses, "prompt": prompt}
+                st = {"last_seen_turn": current, "focus": focus, "lenses": lenses, "prompt": prompt,
+                      "recall_surfaced": [sid for sid, _ in recall_seeds]}  # for the Stop-hook assist log
                 if is_cursor:
                     st["cursor_sections"] = accum
                 json.dump(st, f)

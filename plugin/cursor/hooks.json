@@ -9,6 +9,9 @@
     ],
     "afterAgentResponse": [
       { "command": "python3 \"/ABSOLUTE/PATH/TO/assertion-plugin/plugin/scripts/hook_on_stop.py\"" }
+    ],
+    "preCompact": [
+      { "command": "python3 \"/ABSOLUTE/PATH/TO/assertion-plugin/plugin/scripts/hook_on_compact.py\"" }
     ]
   }
 }

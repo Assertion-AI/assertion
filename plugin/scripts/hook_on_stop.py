@@ -69,6 +69,19 @@ def _read_state(session_id: str) -> dict:
         return {}
 
 
+def _read_compactions(session_id: str) -> list:
+    """This session's compaction-event ts (written by the compaction hook / SessionStart-compact).
+    Forwarded to the backend so the assist log can flag cross-segment assists. Separate file from
+    the per-prompt state so the per-turn state write can't clobber it."""
+    safe = "".join(c for c in (session_id or "default") if c.isalnum() or c in "-_")[:64] or "default"
+    path = os.path.join(tempfile.gettempdir(), f"assertion_compaction_{safe}.json")
+    try:
+        with open(path) as f:
+            return (json.load(f) or {}).get("compactions") or []
+    except Exception:
+        return []
+
+
 def _extract_text(content) -> str:
     if isinstance(content, str):
         return content
@@ -161,6 +174,12 @@ def main() -> int:
     focus = _read_state(sid).get("focus")
     if focus:
         update["focus"] = focus      # anchor placement to where this session is working
+    surfaced = _read_state(sid).get("recall_surfaced")
+    if surfaced:
+        update["recall_surfaced"] = surfaced  # node ids this turn's recall surfaced → assist log (∩ cited)
+    comps = _read_compactions(sid)
+    if comps:
+        update["compactions"] = comps         # this session's compaction ts → assist-log cross-segment
     repo = _detect_repo(payload.get("cwd") or os.getcwd())
     if repo:
         update["repo"] = repo        # provenance: route/group this turn's nodes by codebase
