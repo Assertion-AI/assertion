@@ -144,14 +144,17 @@ def main() -> int:
     #   prompt-submit hook stashed in session state. Claude Code's Stop has neither; we walk the
     #   transcript for both halves of the turn.
     if payload.get("last_assistant_message") is not None:
+        client = "codex"
         assistant_text = payload.get("last_assistant_message") or ""
         user_text = _read_state(sid).get("prompt") or ""
     elif payload.get("cursor_version") is not None:
         # Cursor's afterAgentResponse: assistant text in `text`, prompt from stashed state.
         # Keyed on cursor_version (Cursor-exclusive) so Codex/Claude never take this path.
+        client = "cursor"
         assistant_text = payload.get("text") or ""
         user_text = _read_state(sid).get("prompt") or ""
     else:
+        client = "claude"
         transcript_path = payload.get("transcript_path")
         if not transcript_path:
             return 0
@@ -183,6 +186,10 @@ def main() -> int:
     repo = _detect_repo(payload.get("cwd") or os.getcwd())
     if repo:
         update["repo"] = repo        # provenance: route/group this turn's nodes by codebase
+    update["client"] = client                       # which IDE this turn came from (claude/cursor/codex)
+    pv = _creds.plugin_version()
+    if pv:
+        update["plugin_version"] = pv               # installed plugin version → studio upgrade nudge
     body = json.dumps(update).encode()
     # Send the workspace header so the WRITE lands in the same workspace the reads use.
     # Without it the backend defaults to "default" — which would route a dev's captures

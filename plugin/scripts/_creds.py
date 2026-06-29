@@ -69,3 +69,28 @@ def path_prefix() -> str:
 
 def workspace() -> str:
     return _resolve(["ASSERTION_WORKSPACE", "CONTEXT_TREE_WORKSPACE"], "workspace", "default")
+
+
+_VERSION_CACHE = None
+
+
+def plugin_version() -> str:
+    """The installed plugin version, read from the plugin manifest (single source of truth).
+    Scripts live in plugin/scripts/; the manifest is a sibling under .claude-plugin/ (Codex uses
+    .codex-plugin/ — same version). Sent to the backend each turn so the studio page can show the
+    user's version and nudge an upgrade. Empty string if it can't be read (treated as 'unknown')."""
+    global _VERSION_CACHE
+    if _VERSION_CACHE is not None:
+        return _VERSION_CACHE
+    here = os.path.dirname(os.path.abspath(__file__))
+    for rel in ("../.claude-plugin/plugin.json", "../.codex-plugin/plugin.json"):
+        try:
+            with open(os.path.normpath(os.path.join(here, rel))) as f:
+                v = (json.load(f) or {}).get("version") or ""
+            if v:
+                _VERSION_CACHE = v
+                return v
+        except Exception:
+            continue
+    _VERSION_CACHE = ""
+    return ""
