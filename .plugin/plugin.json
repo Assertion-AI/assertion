@@ -1,6 +1,6 @@
 {
   "name": "assertion",
-  "version": "0.1.0",
+  "version": "0.2.1",
   "description": "Persistent, structured memory for your coding agent — it recalls past decisions, captures each session automatically, and keeps your memory correct when decisions change.",
   "homepage": "https://assertion-ai.com",
   "repository": "https://github.com/Assertion-AI/assertion",

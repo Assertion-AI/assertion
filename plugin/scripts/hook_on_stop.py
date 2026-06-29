@@ -138,27 +138,29 @@ def main() -> int:
     # by the prompt hook is found.
     sid = payload.get("session_id") or payload.get("conversation_id")
 
-    # Platform detection by input shape — one set of scripts serves Claude Code, Codex AND Cursor:
-    #   Codex's Stop hook provides `last_assistant_message` (and no prompt); Cursor's
-    #   afterAgentResponse provides `text` (and no prompt) — both are paired with the prompt the
-    #   prompt-submit hook stashed in session state. Claude Code's Stop has neither; we walk the
-    #   transcript for both halves of the turn.
-    if payload.get("last_assistant_message") is not None:
-        client = "codex"
-        assistant_text = payload.get("last_assistant_message") or ""
-        user_text = _read_state(sid).get("prompt") or ""
-    elif payload.get("cursor_version") is not None:
+    # Platform detection by input shape — one set of scripts serves Claude Code, Codex AND Cursor.
+    # ORDER MATTERS: test the most-exclusive signal first.
+    #   - Cursor's afterAgentResponse carries `cursor_version` (Cursor-exclusive).
+    #   - Claude Code's Stop carries `transcript_path` (Claude-exclusive; we walk it for both halves
+    #     of the turn). NOTE: Claude Code now ALSO sends `last_assistant_message`, so it can no
+    #     longer be used as a Codex discriminator — `transcript_path` must be checked BEFORE it,
+    #     or Claude turns get mislabeled `codex`.
+    #   - Codex's Stop carries `last_assistant_message` and no `transcript_path`/prompt; the prompt
+    #     comes from the state the prompt-submit hook stashed.
+    if payload.get("cursor_version") is not None:
         # Cursor's afterAgentResponse: assistant text in `text`, prompt from stashed state.
-        # Keyed on cursor_version (Cursor-exclusive) so Codex/Claude never take this path.
         client = "cursor"
         assistant_text = payload.get("text") or ""
         user_text = _read_state(sid).get("prompt") or ""
-    else:
+    elif payload.get("transcript_path"):
         client = "claude"
-        transcript_path = payload.get("transcript_path")
-        if not transcript_path:
-            return 0
-        user_text, assistant_text = extract_latest_turn(transcript_path)
+        user_text, assistant_text = extract_latest_turn(payload["transcript_path"])
+    elif payload.get("last_assistant_message") is not None:
+        client = "codex"
+        assistant_text = payload.get("last_assistant_message") or ""
+        user_text = _read_state(sid).get("prompt") or ""
+    else:
+        return 0
 
     if not user_text and not assistant_text:
         return 0
