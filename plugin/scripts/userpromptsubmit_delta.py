@@ -40,6 +40,57 @@ def _state_path(session_id: str) -> str:
     return os.path.join(tempfile.gettempdir(), f"assertion_session_{safe}.json")
 
 
+def _last_assistant_excerpt(transcript_path: str, max_chars: int = 1500) -> str:
+    """Best-effort text of the MOST RECENT assistant message in the transcript, used to give an
+    anaphoric prompt a topic. Tail-reads the file (transcripts grow unbounded — the last assistant
+    turn is near the end) and parses the last assistant text block. Empty on any error / when there's
+    no transcript_path (Codex's Stop & Cursor don't pass one, so this is Claude-Code-only — fine, it
+    degrades to prompt-only recall there)."""
+    if not transcript_path:
+        return ""
+    try:
+        with open(transcript_path, "rb") as f:
+            f.seek(0, 2)
+            size = f.tell()
+            f.seek(max(0, size - 262144))   # last 256 KiB is plenty for the final assistant turn
+            tail = f.read().decode("utf-8", "replace")
+    except Exception:
+        return ""
+    last = ""
+    for line in tail.splitlines():
+        try:
+            d = json.loads(line)            # a tail-truncated first line just fails to parse → skipped
+        except Exception:
+            continue
+        if d.get("type") != "assistant":
+            continue
+        content = (d.get("message", {}) or {}).get("content")
+        parts = []
+        if isinstance(content, list):
+            parts = [b.get("text", "") for b in content
+                     if isinstance(b, dict) and b.get("type") == "text"]
+        elif isinstance(content, str):
+            parts = [content]
+        txt = "\n".join(p for p in parts if p).strip()
+        if txt:
+            last = txt
+    return last[-max_chars:] if last else ""
+
+
+def _recall_query(prompt: str, transcript_path: str, max_chars: int = 2000) -> str:
+    """The text semantic recall runs on. Normally just the prompt — but a SHORT/anaphoric prompt
+    ('yes', 'do it', 'do both', 'go ahead') carries no topic signal, so recall on it alone drops below
+    the relevance floor (silent) or matches noise. For those, blend in the tail of the last assistant
+    message — the intent the user is answering — so a bare 'yes' inherits e.g. 'deploy the backend' and
+    surfaces the right notes at the deciding turn. Prompt goes FIRST so it's never truncated; only
+    short prompts trigger blending, so substantive prompts behave exactly as before (no regression)."""
+    if len(prompt.split()) <= 8:                    # likely a confirmation / anaphor — thin on topic
+        ctx = _last_assistant_excerpt(transcript_path)
+        if ctx:
+            return (prompt + "\n\n[recent context]\n" + ctx)[:max_chars]
+    return prompt[:max_chars]
+
+
 def _get(path_qs: str, timeout: int = 5):
     req = urllib.request.Request(f"{_BASE}{_PREFIX}{path_qs}",
                                  headers={"x-api-key": _KEY, "X-Assertion-Workspace": _WS})
@@ -98,6 +149,7 @@ def main() -> int:
         prompt = ""
         is_cursor = False
         project_dir = None
+        transcript_path = ""
         try:
             payload = json.loads(sys.stdin.read() or "{}")
             # Cursor's beforeSubmitPrompt has no session_id — it keys turns by conversation_id;
@@ -107,6 +159,9 @@ def main() -> int:
             # Detect Cursor ONLY by `cursor_version` (Cursor-exclusive, always present) so this
             # can't misfire on a Claude/Codex prompt payload.
             is_cursor = bool(payload.get("cursor_version"))
+            # Claude Code passes the transcript on UserPromptSubmit — used to give an anaphoric
+            # prompt ('yes'/'do both') the topic of the last assistant turn for recall.
+            transcript_path = payload.get("transcript_path") or ""
             # Cursor Rules files are project-scoped; find the project root for the rules write.
             project_dir = ((payload.get("workspace_roots") or [None])[0]
                            or os.environ.get("CURSOR_PROJECT_DIR")
@@ -133,7 +188,8 @@ def main() -> int:
         # waits ~max(delta, search) instead of the sum. Blocking urllib calls release the GIL during
         # the network wait, so threads parallelize fine. stdlib-only (concurrent.futures).
         _pool = concurrent.futures.ThreadPoolExecutor(max_workers=2)
-        _search_fut = (_pool.submit(_get_json, "/search?" + urllib.parse.urlencode({"q": prompt[:2000]}))
+        _search_fut = (_pool.submit(_get_json, "/search?" + urllib.parse.urlencode(
+                           {"q": _recall_query(prompt, transcript_path)}))
                        if prompt.strip() else None)
         _delta_fut = _pool.submit(_get_json, "/working-set/delta?" + qs)
         data = _delta_fut.result()   # delta failure propagates → outer try fails open (return 0)
