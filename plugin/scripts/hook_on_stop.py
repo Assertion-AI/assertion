@@ -138,29 +138,43 @@ def main() -> int:
     # by the prompt hook is found.
     sid = payload.get("session_id") or payload.get("conversation_id")
 
-    # Platform detection by input shape — one set of scripts serves Claude Code, Codex AND Cursor.
-    # ORDER MATTERS: test the most-exclusive signal first.
+    # --- Client LABEL: detect by the most-exclusive input signal (decoupled from the capture
+    # source below). ORDER MATTERS: `transcript_path` is Claude-exclusive and MUST be tested before
+    # `last_assistant_message` (Claude Code now sends both), or Claude turns get mislabeled `codex`.
     #   - Cursor's afterAgentResponse carries `cursor_version` (Cursor-exclusive).
-    #   - Claude Code's Stop carries `transcript_path` (Claude-exclusive; we walk it for both halves
-    #     of the turn). NOTE: Claude Code now ALSO sends `last_assistant_message`, so it can no
-    #     longer be used as a Codex discriminator — `transcript_path` must be checked BEFORE it,
-    #     or Claude turns get mislabeled `codex`.
-    #   - Codex's Stop carries `last_assistant_message` and no `transcript_path`/prompt; the prompt
-    #     comes from the state the prompt-submit hook stashed.
+    #   - Claude Code's Stop carries `transcript_path`.
+    #   - Codex's Stop carries `last_assistant_message` and no `transcript_path`.
     if payload.get("cursor_version") is not None:
-        # Cursor's afterAgentResponse: assistant text in `text`, prompt from stashed state.
         client = "cursor"
-        assistant_text = payload.get("text") or ""
-        user_text = _read_state(sid).get("prompt") or ""
     elif payload.get("transcript_path"):
         client = "claude"
-        user_text, assistant_text = extract_latest_turn(payload["transcript_path"])
     elif payload.get("last_assistant_message") is not None:
         client = "codex"
-        assistant_text = payload.get("last_assistant_message") or ""
-        user_text = _read_state(sid).get("prompt") or ""
     else:
         return 0
+
+    # --- Capture SOURCE, decoupled from the label. Prefer the INLINE assistant message
+    # (`last_assistant_message`, or Cursor's `text`) + the prompt the submit-hook stashed: these
+    # are present in the Stop payload itself, so they're immune to the transcript-flush race that
+    # made claude-vscode silently drop turns (VSCode can fire Stop before the final assistant block
+    # is written to the .jsonl). This is the robust v0.2.0 capture path. For Claude we ALSO read the
+    # transcript and keep its fuller multi-message narration WHEN it already contains the final
+    # answer (fully flushed); if the transcript is empty or only partially flushed, the inline answer
+    # is authoritative. Net: robust like v0.2.0, plus Claude's richer narration when available. ---
+    inline = payload.get("last_assistant_message") or payload.get("text") or ""
+    user_text = _read_state(sid).get("prompt") or ""
+    assistant_text = inline
+    if payload.get("transcript_path"):
+        t_user, t_assistant = extract_latest_turn(payload["transcript_path"])
+        if not user_text.strip():
+            user_text = t_user
+        if not inline.strip():
+            assistant_text = t_assistant                      # older Claude Code (no inline) → transcript
+        elif inline.strip() in t_assistant:
+            assistant_text = t_assistant                      # fully flushed → keep richer narration
+        else:
+            assistant_text = (f"{t_assistant}\n{inline}".strip()
+                              if t_assistant.strip() else inline)  # partial/empty flush → inline wins
 
     if not user_text and not assistant_text:
         return 0
