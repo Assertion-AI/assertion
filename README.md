@@ -5,7 +5,7 @@ behind your decisions and the strategy across your project — and keeps it **cu
 superseding calls you've reversed instead of resurfacing them. It **recalls** that context
 automatically as you work, into a shared, project-scoped tree. Reads run over a hosted MCP
 endpoint (no local server); small hooks handle capture and context injection. One codebase
-serves all three agents (single copy of the logic). By [Assertion AI](https://assertion-ai.com).
+serves all three agents (single copy of the logic). By Assertion AI.
 
 Get your key at https://studio.assertion-ai.com/connect. Requires a system `python3` (for the stdlib
 hooks) — no other deps.
