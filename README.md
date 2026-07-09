@@ -1,12 +1,13 @@
-# Assertion — persistent memory for your coding agent
+# Assertion — a second brain for your codebase
 
-Give **Claude Code**, **OpenAI Codex**, and **Cursor** a memory that persists across
-sessions: it **recalls** prior work and **auto-captures** each turn into a shared,
-project-scoped memory tree. Reads run over a hosted MCP endpoint (no local server);
-small hooks handle capture and context injection. One codebase serves all three agents
-(single copy of the logic). By [Assertion AI](https://assertion-ai.com).
+Gives **Claude Code**, **OpenAI Codex**, and **Cursor** memory that remembers the *why*
+behind your decisions and the strategy across your project — and keeps it **current**,
+superseding calls you've reversed instead of resurfacing them. It **recalls** that context
+automatically as you work, into a shared, project-scoped tree. Reads run over a hosted MCP
+endpoint (no local server); small hooks handle capture and context injection. One codebase
+serves all three agents (single copy of the logic). By Assertion AI.
 
-Get your key at https://assertion-ai.com. Requires a system `python3` (for the stdlib
+Get your key at https://studio.assertion-ai.com/connect. Requires a system `python3` (for the stdlib
 hooks) — no other deps.
 
 ## Install — Claude Code
@@ -27,7 +28,7 @@ The `env` block is the reliable way to provide the key — Claude Code injects i
 **both** the memory tools (MCP) **and** the capture hook, so your turns are actually
 recorded. It also works **regardless of how you launch Claude Code** (terminal or app).
 
-Get your key at https://assertion-ai.com. Restart Claude Code; run `/mcp` to confirm
+Get your key at https://studio.assertion-ai.com/connect. Restart Claude Code; run `/mcp` to confirm
 `assertion` is connected, then try `recall <topic>`.
 
 **Requirements:** a system `python3` (for the two stdlib hooks). No other deps — the
