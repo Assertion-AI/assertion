@@ -182,14 +182,27 @@ def main() -> int:
         focus = state.get("focus")
         lenses = state.get("lenses") or {}   # anchor_id -> ancestor_path
 
-        qs = urllib.parse.urlencode({"since_turn": last if last is not None else 0, "levels": "all"})
+        # Session pinning + repo rider: name the session (real ids only — never the 'default'
+        # fallback) so the server pins this session to the current default at first sight and
+        # in-session switches can bind; `repo` is the future repo->space routing signal.
+        _extra = {}
+        if session_id and session_id != "default" and len(session_id) >= 8:
+            _extra["session_id"] = session_id
+        try:
+            import hook_on_stop as _hos
+            _repo = _hos._detect_repo(payload.get("cwd") or project_dir or "")
+            if _repo:
+                _extra["repo"] = _repo
+        except Exception:
+            pass
+        qs = urllib.parse.urlencode({"since_turn": last if last is not None else 0, "levels": "all", **_extra})
         # Fork-join: /working-set/delta (cross-session deltas + focus) and /search (prompt-driven
         # recall) share no inputs or outputs, so fire both concurrently — the per-prompt hook then
         # waits ~max(delta, search) instead of the sum. Blocking urllib calls release the GIL during
         # the network wait, so threads parallelize fine. stdlib-only (concurrent.futures).
         _pool = concurrent.futures.ThreadPoolExecutor(max_workers=2)
         _search_fut = (_pool.submit(_get_json, "/search?" + urllib.parse.urlencode(
-                           {"q": _recall_query(prompt, transcript_path)}))
+                           {"q": _recall_query(prompt, transcript_path), **_extra}))
                        if prompt.strip() else None)
         _delta_fut = _pool.submit(_get_json, "/working-set/delta?" + qs)
         data = _delta_fut.result()   # delta failure propagates → outer try fails open (return 0)
@@ -310,6 +323,16 @@ def main() -> int:
                 "prior turns may have made these). Treat as background you now know.\n\n"
                 + "\n".join(lines) + "\n</assertion_memory_updates>")
 
+        # ---- Workspace statement (once per session): where this session's memory goes ----
+        ws_note = (data.get("workspace_note") or "").strip()
+        ws_note_shown = bool(state.get("ws_note_shown"))
+        if ws_note and not ws_note_shown:
+            sections.insert(0,
+                "<assertion_workspace>\n" + ws_note +
+                "\nBriefly state this at the start of your reply so the user knows where this "
+                "session's memory goes.\n</assertion_workspace>")
+            ws_note_shown = True
+
         # On Cursor, accumulate this turn's lens sections across the session so the rules file
         # is a growing snapshot (Cursor re-reads it whole each prompt), bounded by char cap.
         accum = (state.get("cursor_sections") or []) if is_cursor else []
@@ -321,6 +344,7 @@ def main() -> int:
         try:
             with open(sp, "w") as f:
                 st = {"last_seen_turn": current, "focus": focus, "lenses": lenses, "prompt": prompt,
+                      "ws_note_shown": ws_note_shown,
                       "recall_surfaced": [sid for sid, _ in recall_seeds]}  # for the Stop-hook assist log
                 if is_cursor:
                     st["cursor_sections"] = accum

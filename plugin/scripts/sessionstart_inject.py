@@ -18,6 +18,7 @@ import os
 import sys
 import tempfile
 import time
+import urllib.parse
 import urllib.request
 
 import _creds
@@ -96,8 +97,13 @@ def main() -> int:
                 _mark_compaction(payload.get("session_id"))   # Claude Code / Codex compaction event
             if src != "compact":
                 try:
+                    # Session pinning: naming the session on the recap call is the canonical
+                    # pin-creation moment server-side (first-seen binds to the current default).
+                    # Only real ids — never the 'default' fallback (server ignores it anyway).
+                    _sid = payload.get("session_id") or payload.get("conversation_id") or ""
+                    _sid_q = ("?" + urllib.parse.urlencode({"session_id": _sid})) if len(_sid) >= 8 else ""
                     rreq = urllib.request.Request(
-                        f"{base}{prefix}/recap",
+                        f"{base}{prefix}/recap{_sid_q}",
                         headers={"x-api-key": key, "X-Assertion-Workspace": workspace})
                     with urllib.request.urlopen(rreq, timeout=10) as rresp:
                         recap = rresp.read().decode("utf-8", "replace").strip()
