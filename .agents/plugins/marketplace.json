@@ -6,7 +6,7 @@
   "plugins": [
     {
       "name": "assertion",
-      "version": "0.1.15",
+      "version": "0.3.0",
       "source": {
         "source": "local",
         "path": "./plugin"
@@ -16,7 +16,7 @@
         "authentication": "ON_INSTALL"
       },
       "category": "Productivity",
-      "description": "Persistent memory for coding agents — recall + auto-capture across sessions."
+      "description": "Persistent memory for coding agents \u2014 recall + auto-capture across sessions."
     }
   ]
 }
