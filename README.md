@@ -87,3 +87,16 @@ to prod + the shared `default` workspace. Options (`--key`, `--workspace`, `--se
 - **SessionStart hook** — injects the project's working-set into context.
 
 Both hooks **fail open**: if the backend is unreachable, your session is never blocked.
+
+## Optional: show your memory space in the Claude Code status line
+
+A permanent `📁 <space>` indicator at the bottom of your terminal — instant, local, per-session-accurate. In `~/.claude/settings.json`:
+
+```json
+"statusLine": {
+  "type": "command",
+  "command": "python3 ~/.claude/plugins/cache/assertion-ai/assertion/scripts/statusline_space.py"
+}
+```
+
+(If you already have a statusline command, chain this after it.)

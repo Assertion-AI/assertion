@@ -95,6 +95,21 @@ def main() -> int:
             src = (payload.get("source") or "").lower()
             if src == "compact":
                 _mark_compaction(payload.get("session_id"))   # Claude Code / Codex compaction event
+            if src in ("compact", "resume"):
+                # Awareness pack: after a context reset, ask the next turn to RE-STATE the
+                # session's space if it's a team space (the delta hook reads+clears the flag).
+                try:
+                    _s = payload.get("session_id") or payload.get("conversation_id") or "default"
+                    _safe = "".join(c for c in str(_s) if c.isalnum() or c in "-_")[:64] or "default"
+                    _sp = os.path.join(tempfile.gettempdir(), f"assertion_session_{_safe}.json")
+                    try:
+                        _st = json.load(open(_sp))
+                    except Exception:
+                        _st = {}
+                    _st["restate_space"] = True
+                    json.dump(_st, open(_sp, "w"))
+                except Exception:
+                    pass
             if src != "compact":
                 try:
                     # Session pinning: naming the session on the recap call is the canonical

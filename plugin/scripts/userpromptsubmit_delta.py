@@ -323,10 +323,44 @@ def main() -> int:
                 "prior turns may have made these). Treat as background you now know.\n\n"
                 + "\n".join(lines) + "\n</assertion_memory_updates>")
 
-        # ---- Workspace statement (once per session): where this session's memory goes ----
+        # ---- Awareness pack: where this session's memory goes ----
+        # Layer 1: a model-facing line EVERY turn (ground truth fetched this prompt), so
+        # "which space am I in?" never depends on stale conversation context. Layer 2: say
+        # it OUT LOUD only on transitions — space changed, first team-space turn, or after
+        # a compaction/resume (the restate flag set by the SessionStart hook) — so the
+        # visible signal keeps meaning something. Cursor's rules file accumulates sections,
+        # so it gets transitions only (they persist there — its own steady-state display).
+        eff = data.get("effective_space") or {}
+        eff_ws = (eff.get("workspace") or "").strip()
         ws_note = (data.get("workspace_note") or "").strip()
         ws_note_shown = bool(state.get("ws_note_shown"))
-        if ws_note and not ws_note_shown:
+        last_space = state.get("last_space")
+        restate = bool(state.get("restate_space"))
+        if eff_ws:
+            if eff.get("personal"):
+                space_line = "Memory for this session: your personal tree."
+            else:
+                _n = eff.get("member_count") or 1
+                space_line = ("Memory for this session: team space \"" + str(eff.get("name") or eff_ws)
+                              + "\" (" + str(_n) + " member" + ("s" if _n != 1 else "")
+                              + " can see what's captured).")
+            changed = last_space is not None and eff_ws != last_space
+            first_team = last_space is None and not eff.get("personal")
+            if changed or first_team or (restate and not eff.get("personal")):
+                sections.insert(0,
+                    "<assertion_space>\n" + space_line +
+                    ("\nThis CHANGED from earlier in the session." if changed else "") +
+                    "\nBriefly state this at the start of your reply so the user knows where "
+                    "this session's memory goes.\n</assertion_space>")
+            elif not is_cursor:
+                sections.append("<assertion_space>\n" + space_line +
+                                "\n(For your awareness — no need to mention unless asked.)\n"
+                                "</assertion_space>")
+            last_space = eff_ws
+            restate = False
+            ws_note_shown = True
+        elif ws_note and not ws_note_shown:
+            # legacy server (pre-effective_space): the old once-per-session statement
             sections.insert(0,
                 "<assertion_workspace>\n" + ws_note +
                 "\nBriefly state this at the start of your reply so the user knows where this "
@@ -344,7 +378,8 @@ def main() -> int:
         try:
             with open(sp, "w") as f:
                 st = {"last_seen_turn": current, "focus": focus, "lenses": lenses, "prompt": prompt,
-                      "ws_note_shown": ws_note_shown,
+                      "ws_note_shown": ws_note_shown, "last_space": last_space,
+                      "restate_space": restate,
                       "recall_surfaced": [sid for sid, _ in recall_seeds]}  # for the Stop-hook assist log
                 if is_cursor:
                     st["cursor_sections"] = accum
