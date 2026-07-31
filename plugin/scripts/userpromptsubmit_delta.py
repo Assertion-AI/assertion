@@ -367,6 +367,17 @@ def main() -> int:
                 "session's memory goes.\n</assertion_workspace>")
             ws_note_shown = True
 
+        # DURING-SESSION plugin-upgrade nudge (v0.3.4+): the backend delta hands us
+        # upgrade = {notice, recipe} when THIS client is behind the latest version. Inject the
+        # RECIPE every turn (model-facing) so the assistant can update whenever the user agrees;
+        # the visible NOTICE is shown ONCE per session (below) to avoid per-turn nagging. Old
+        # backends omit the field → this is a no-op there.
+        _upg = data.get("upgrade") or {}
+        _upg_notice, _upg_recipe = _upg.get("notice") or "", _upg.get("recipe") or ""
+        _show_upg = bool(_upg_notice) and not state.get("upgrade_shown")
+        if _upg_recipe:
+            sections.append(_upg_recipe)
+
         # On Cursor, accumulate this turn's lens sections across the session so the rules file
         # is a growing snapshot (Cursor re-reads it whole each prompt), bounded by char cap.
         accum = (state.get("cursor_sections") or []) if is_cursor else []
@@ -380,6 +391,7 @@ def main() -> int:
                 st = {"last_seen_turn": current, "focus": focus, "lenses": lenses, "prompt": prompt,
                       "ws_note_shown": ws_note_shown, "last_space": last_space,
                       "restate_space": restate,
+                      "upgrade_shown": bool(state.get("upgrade_shown")) or _show_upg,
                       "recall_surfaced": [sid for sid, _ in recall_seeds]}  # for the Stop-hook assist log
                 if is_cursor:
                     st["cursor_sections"] = accum
@@ -425,6 +437,11 @@ def main() -> int:
                 out["systemMessage"] = "🌳 Updated since you last worked here:\n" + body
             elif rebaselined:
                 out["systemMessage"] = "🌳 New workstream detected — re-oriented to the current project map."
+            # Plugin-upgrade notice: once per session, prepended so it shows regardless of the
+            # recall/awareness banner above (or stands alone when there's nothing else this turn).
+            if _show_upg:
+                _b = out.get("systemMessage")
+                out["systemMessage"] = _upg_notice + (("\n\n" + _b) if _b else "")
             if out:
                 sys.stdout.write(json.dumps(out))
     except Exception:
