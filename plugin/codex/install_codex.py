@@ -35,6 +35,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import time
@@ -257,11 +258,31 @@ def strip_section(text: str, section: str) -> str:
 
 
 def write_mcp_block(key: str, server: str, workspace: str) -> None:
+    """Write the recall/expand MCP server into ~/.codex/config.toml.
+
+    The bearer token is written literally, and that is deliberate. Static analysis
+    flags it as clear-text storage of a credential, which is a fair category, so
+    the reasoning is recorded here rather than left to be rediscovered:
+
+    * A `${VAR}` placeholder inside `http_headers` is NOT a supported form. Codex
+      does not expand environment variables there, so it would transmit the
+      literal string "Bearer ${ASSERTION_API_KEY}" and every recall would 401.
+      The supported env-var form is a different key entirely,
+      `bearer_token_env_var` (see codex/config.toml.example).
+    * That supported form only works in the CLI. GUI hosts — the desktop app and
+      the VS Code panel — do not inherit the user's shell environment, so an
+      env-var reference resolves to nothing there. A literal token is the only
+      form that works on every surface, which is the whole reason the plugin
+      documents it that way (verified on codex 0.139).
+    * The control that actually applies here is file permissions, enforced below:
+      the file is written 0600, and we verify the result rather than assume it.
+      This matches how Codex stores its own credentials — ~/.codex/auth.json is
+      0600 in the same directory.
+
+    Changing this to a placeholder would silently break recall for desktop and
+    IDE users while looking like a security improvement.
+    """
     url = f"{server.rstrip('/')}/memory/mcp/{workspace}"
-    # http_headers, NOT bearer_token: Codex rejects bearer_token for HTTP MCP
-    # servers. Putting the literal key here (rather than an env var) is what makes
-    # recall/expand work in the VS Code panel too, since GUI hosts do not pass the
-    # user's shell environment through to plugins.
     block = (
         f"[{MCP_SECTION}]\n"
         f'url = "{url}"\n'
@@ -278,22 +299,43 @@ def write_mcp_block(key: str, server: str, workspace: str) -> None:
     body = (cleaned + "\n\n" + block) if cleaned else block
 
     os.makedirs(os.path.dirname(CODEX_CONFIG), exist_ok=True)
-    with open(CODEX_CONFIG, "w") as f:
+    # Create with 0600 from the outset. Writing first and chmod-ing after leaves a
+    # window where the token sits in a file the default umask made world-readable.
+    fd = os.open(CODEX_CONFIG, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
         f.write(body)
     os.chmod(CODEX_CONFIG, 0o600)
-    print(f"  wrote [{MCP_SECTION}] into {CODEX_CONFIG}")
+
+    mode = stat.S_IMODE(os.stat(CODEX_CONFIG).st_mode)
+    if mode & 0o077:
+        print(f"  WARNING: {CODEX_CONFIG} is mode {mode:o}; it holds an API token."
+              f"\n           Fix with: chmod 600 {CODEX_CONFIG}")
+    print(f"  wrote [{MCP_SECTION}] into {CODEX_CONFIG} (mode {mode:o})")
 
 
 def write_creds(key: str, server: str) -> None:
+    """Write the API key where the capture/inject hooks read it.
+
+    A file rather than an env var by necessity: GUI hosts do not pass the user's
+    shell environment to hooks, so `export` does not reach them. Same reasoning,
+    and the same 0600 control, as write_mcp_block above.
+    """
     creds = load_json(CREDS)
     creds["api_key"] = key
     creds["server_url"] = server
     backup(CREDS)
     os.makedirs(os.path.dirname(CREDS), exist_ok=True)
-    with open(CREDS, "w") as f:
+    # 0600 at creation, not after the write — see write_mcp_block.
+    fd = os.open(CREDS, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
         json.dump(creds, f, indent=2)
     os.chmod(CREDS, 0o600)
-    print(f"  wrote {CREDS}")
+
+    mode = stat.S_IMODE(os.stat(CREDS).st_mode)
+    if mode & 0o077:
+        print(f"  WARNING: {CREDS} is mode {mode:o}; it holds an API key."
+              f"\n           Fix with: chmod 600 {CREDS}")
+    print(f"  wrote {CREDS} (mode {mode:o})")
 
 
 # --------------------------------------------------------------------------- #
