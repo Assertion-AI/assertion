@@ -91,7 +91,7 @@ def _recall_query(prompt: str, transcript_path: str, max_chars: int = 2000) -> s
     return prompt[:max_chars]
 
 
-def _get(path_qs: str, timeout: int = 5):
+def _get(path_qs: str, timeout: int = 8):
     req = urllib.request.Request(f"{_BASE}{_PREFIX}{path_qs}",
                                  headers={"x-api-key": _KEY, "X-Assertion-Workspace": _WS})
     with urllib.request.urlopen(req, timeout=timeout) as r:
@@ -99,7 +99,7 @@ def _get(path_qs: str, timeout: int = 5):
     return body
 
 
-def _get_json(path_qs: str, timeout: int = 5):
+def _get_json(path_qs: str, timeout: int = 8):
     return json.loads(_get(path_qs, timeout))
 
 
