@@ -1,0 +1,12 @@
+Assertion plugin for Claude Code, Cursor and Codex
+Copyright 2026 Assertion AI, Inc.
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+"Assertion" and the Assertion logo are trademarks of Assertion AI, Inc. The
+license grants no rights to use them, other than as needed to describe the
+origin of this software (Apache License 2.0, section 6).
+
+This repository contains the client plugin only. Use of the hosted Assertion
+service it connects to is governed by the Assertion Terms of Service at
+https://assertion-ai.com/terms, not by this license.

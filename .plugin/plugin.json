@@ -12,5 +12,6 @@
     "context",
     "mcp",
     "belief-revision"
-  ]
+  ],
+  "license": "Apache-2.0"
 }

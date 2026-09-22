@@ -100,3 +100,9 @@ A permanent `📁 <space>` indicator at the bottom of your terminal — instant,
 ```
 
 (If you already have a statusline command, chain this after it.)
+
+## License
+
+The plugin in this repository is licensed under the [Apache License 2.0](LICENSE). See [NOTICE](NOTICE).
+
+The license covers this client code only. The hosted Assertion service it connects to is governed by the [Terms of Service](https://assertion-ai.com/terms), and your data by the [privacy notice](https://assertion-ai.com/privacy). "Assertion" is a trademark of Assertion AI, Inc.
