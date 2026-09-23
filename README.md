@@ -12,6 +12,8 @@ hooks) — no other deps.
 
 ## Install — Claude Code
 
+> **Already installed?** Keep the copy you have. If you installed from this repo (`assertion@assertion-ai`), don't also install it from the Claude Code community catalog (`assertion@claude-community`). Two copies means two sets of hooks, so every turn is captured twice. `/assertion:upgrade` updates whichever copy you have.
+
 ```
 # 1) in Claude Code:
 /plugin marketplace add Assertion-AI/assertion
