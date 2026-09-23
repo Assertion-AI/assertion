@@ -1,0 +1,71 @@
+# Keeps the plugin's version in one voice, and releases each new version.
+#
+# Every manifest carries its own copy of the version: Claude Code, Codex and the generic one.
+# They drifted once (three sat at 0.3.2 while the plugin shipped 0.3.5) because nothing checked.
+# On every pull request and every push to main, `check` fails if they disagree, or if the
+# version has no CHANGELOG entry.
+#
+# On a push to main, `release` tags v<version> and publishes a GitHub release with that version's
+# CHANGELOG section as its notes, unless the tag already exists. So bumping the version and adding
+# its changelog entry in a pull request is the whole release process.
+name: Release
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        name: Every manifest reports the same version
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib, sys
+          found = {}
+          for p in pathlib.Path(".").rglob("*.json"):
+              if ".git" in p.parts or p.name not in ("plugin.json", "marketplace.json"):
+                  continue
+              d = json.loads(p.read_text())
+              if p.name == "plugin.json" and d.get("name") == "assertion":
+                  found[str(p)] = d.get("version")
+              for e in d.get("plugins", []) if isinstance(d.get("plugins"), list) else []:
+                  if e.get("name") == "assertion":
+                      found[str(p)] = e.get("version")
+          for f, v in sorted(found.items()):
+              print(f"{v}  {f}")
+          versions = set(found.values())
+          if len(versions) != 1 or None in versions:
+              sys.exit(f"::error::Manifests disagree on the version: {sorted(map(str, versions))}")
+          (version,) = versions
+          if f"## [{version}]" not in pathlib.Path("CHANGELOG.md").read_text():
+              sys.exit(f"::error::CHANGELOG.md has no '## [{version}]' entry")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write(f"version={version}\n")
+          PY
+
+  release:
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag and release the version if it is new
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "v$VERSION is already released."
+            exit 0
+          fi
+          # This version's CHANGELOG section, from its heading up to the next one.
+          awk -v h="## [$VERSION]" 'index($0, h) == 1 {on = 1; next} /^## \[/ {on = 0} on' CHANGELOG.md > notes.md
+          gh release create "v$VERSION" --target "$GITHUB_SHA" --title "v$VERSION" --notes-file notes.md --latest
