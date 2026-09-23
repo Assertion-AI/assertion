@@ -8,8 +8,8 @@ Update the Assertion memory plugin to the latest version.
 Run these two commands (this is Claude Code):
 
 ```
-claude plugin marketplace update assertion-ai
-claude plugin update assertion@assertion-ai
+claude plugin marketplace update
+claude plugin update assertion
 ```
 
 Then report the result plainly, based on the command output:
