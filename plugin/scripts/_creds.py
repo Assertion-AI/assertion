@@ -94,3 +94,15 @@ def plugin_version() -> str:
             continue
     _VERSION_CACHE = ""
     return ""
+
+def install_source() -> str:
+    """Which copy of the plugin this is: the marketplace it was installed from, read from where the
+    host unpacked it (`.../plugins/cache/<marketplace>/<plugin>/<version>/`). `claude-community` is
+    the Claude Code catalog; `assertion-ai` is this GitHub repo. Only that one name is sent, never
+    the path. Empty when the scripts don't live in a plugin cache (Cursor, a local checkout)."""
+    parts = os.path.normpath(os.path.abspath(__file__)).split(os.sep)
+    for i in range(len(parts) - 2):
+        if parts[i] == "plugins" and parts[i + 1] == "cache":
+            name = "".join(c for c in parts[i + 2].lower() if c.isalnum() or c in "-_.")[:40]
+            return name
+    return ""

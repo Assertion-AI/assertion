@@ -206,6 +206,9 @@ def main() -> int:
     pv = _creds.plugin_version()
     if pv:
         update["plugin_version"] = pv               # installed plugin version → studio upgrade nudge
+    src = _creds.install_source()
+    if src:
+        update["install_source"] = src              # which copy: the catalog or the GitHub repo
     body = json.dumps(update).encode()
     # Send the workspace header so the WRITE lands in the same workspace the reads use.
     # Without it the backend defaults to "default" — which would route a dev's captures

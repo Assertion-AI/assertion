@@ -3,6 +3,12 @@
 Notable changes to the Assertion plugin for Claude Code, Cursor and Codex. Each version here
 becomes a GitHub release when it reaches `main`.
 
+## [0.3.7] — 2026-09-23
+
+- Each capture also reports which copy of the plugin is installed: the name of the marketplace it
+  came from (`claude-community` for the Claude Code catalog, `assertion-ai` for this repo). Only
+  that name is sent, never a file path. Nothing is sent for a local checkout.
+
 ## [0.3.6] — 2026-09-22
 
 - The plugin is licensed under the Apache License 2.0. See `LICENSE` and `NOTICE`.
