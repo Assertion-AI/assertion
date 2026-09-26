@@ -18,7 +18,11 @@ Install, then sign in once in your browser. There is no key to copy. Requires a 
 # 1) in Claude Code:
 /plugin marketplace add Assertion-AI/assertion
 /plugin install assertion@assertion-ai
+/reload-plugins
 ```
+`/reload-plugins` turns the plugin on in the session you're in, with no restart. Or install from
+your terminal before you start Claude Code, and skip it:
+`claude plugin marketplace add Assertion-AI/assertion && claude plugin install assertion@assertion-ai`
 
 **2) Sign in:**
 ```
