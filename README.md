@@ -7,8 +7,8 @@ automatically as you work, into a shared, project-scoped tree. Reads run over a 
 endpoint (no local server); small hooks handle capture and context injection. One codebase
 serves all three agents (single copy of the logic). By Assertion AI.
 
-Get your key at https://studio.assertion-ai.com/connect. Requires a system `python3` (for the stdlib
-hooks) — no other deps.
+Install, then sign in once in your browser. There is no key to copy. Requires a system `python3`
+(for the stdlib hooks); no other deps.
 
 ## Install — Claude Code
 
@@ -18,30 +18,36 @@ hooks) — no other deps.
 # 1) in Claude Code:
 /plugin marketplace add Assertion-AI/assertion
 /plugin install assertion@assertion-ai
+/reload-plugins
 ```
+`/reload-plugins` turns the plugin on in the session you're in, with no restart. Or install from
+your terminal before you start Claude Code, and skip it:
+`claude plugin marketplace add Assertion-AI/assertion && claude plugin install assertion@assertion-ai`
 
-**2) Add your key to `~/.claude/settings.json`** (create the file if needed):
-```json
-{
-  "env": { "ASSERTION_API_KEY": "<your key>" }
-}
+**2) Sign in:**
 ```
-The `env` block is the reliable way to provide the key — Claude Code injects it into
-**both** the memory tools (MCP) **and** the capture hook, so your turns are actually
-recorded. It also works **regardless of how you launch Claude Code** (terminal or app).
+/assertion:login
+```
+Your browser opens at Assertion Studio; click **Connect** (new here? sign up on that page first).
+Memory turns on in the same session: the memory tools and capture both pick up the sign-in, with
+no restart and no key to copy. Then try `recall <topic>`. Until you sign in, each session starts
+with a one-line notice that memory is off.
 
-Get your key at https://studio.assertion-ai.com/connect. Restart Claude Code; run `/mcp` to confirm
-`assertion` is connected, then try `recall <topic>`.
+On a machine with no browser (SSH, a server), `/assertion:login code` shows a short code to
+confirm from any device instead.
 
 **Requirements:** a system `python3` (for the two stdlib hooks). No other deps — the
 memory tools connect over HTTP.
 
-> Prefer `~/.claude/settings.json` `env` over `export ASSERTION_API_KEY`. With a bare
-> `export`, the key only reaches the plugin if you launch Claude Code from that same
-> shell — set it in `settings.json` and capture works either way.
+> **Using a key instead** (CI, or a shared machine): `ASSERTION_API_KEY` still works and takes
+> precedence over the sign-in. Put it in `~/.claude/settings.json` as
+> `{"env": {"ASSERTION_API_KEY": "<key>"}}` rather than a shell `export`, so it reaches the plugin
+> however you launch Claude Code.
 >
-> **Upgrading:** use `/plugin update assertion@assertion-ai` (then reload) — `install`
-> does not upgrade an already-installed plugin.
+> **Upgrading:** run `/assertion:upgrade`, then `/reload-plugins`. No restart needed.
+>
+> **Spaces:** `/assertion:space` lists your memory spaces and shows which one this session uses;
+> `/assertion:space <name>` switches this session only (`/assertion:space personal` to go back).
 
 ## Install — OpenAI Codex
 
@@ -50,9 +56,12 @@ memory tools connect over HTTP.
 codex plugin marketplace add Assertion-AI/assertion
 codex plugin add assertion@assertion-ai
 
-# 2) drop your key (one line — works in the CLI and the VS Code extension)
-mkdir -p ~/.assertion && echo '{"api_key":"<your key>"}' > ~/.assertion/credentials.json
+# 2) sign in in your browser (no key to copy)
+python3 "$(ls -d ~/.codex/plugins/cache/*/assertion/*/scripts | sort -V | tail -1)/assertion.py" login --client codex
 ```
+Or, once Codex is open, ask it to "sign in to Assertion" (the plugin's `assertion-login` skill runs
+the same sign-in). Either way the key is saved for the hooks and written into
+`~/.codex/config.toml` for the memory tools.
 
 3. Use Codex **interactively** (`codex` in a terminal, or the VS Code Codex panel — *not*
    `codex exec`). On first run, toggle the three hooks **Trust** on when prompted (once).
@@ -67,12 +76,14 @@ Cursor has no plugin marketplace, so it installs via a one-time script that wire
 
 ```bash
 git clone https://github.com/Assertion-AI/assertion
-cd assertion/plugin/cursor && python3 install_cursor.py   # paste your key when prompted
+cd assertion/plugin/cursor && python3 install_cursor.py   # signs you in in the browser
 ```
 Then fully quit and reopen Cursor. The installer merges into any existing Cursor config
 (it won't touch your other hooks or MCP servers), backs up what it changes, and defaults
-to prod + the shared `default` workspace. Options (`--key`, `--workspace`, `--server`,
-`--uninstall`) and a manual fallback: [plugin/cursor/README.md](plugin/cursor/README.md).
+to prod + the shared `default` workspace. In Cursor, `/assertion-login` signs in again,
+`/assertion-space` lists or switches memory spaces, and `/upgrade` updates the clone. Options
+(`--key`, `--workspace`, `--server`, `--uninstall`) and a manual fallback:
+[plugin/cursor/README.md](plugin/cursor/README.md).
 
 ## What's included
 

@@ -1,20 +1,10 @@
 ---
 description: Update the Assertion memory plugin to the latest version
-allowed-tools: Bash(claude plugin marketplace update:*), Bash(claude plugin update:*)
+allowed-tools: Bash(python3:*)
+disable-model-invocation: true
 ---
 
-Update the Assertion memory plugin to the latest version.
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/assertion.py" upgrade --client claude-code`
 
-Run these two commands (this is Claude Code):
-
-```
-claude plugin marketplace update
-claude plugin update assertion
-```
-
-Then report the result plainly, based on the command output:
-
-- **If a newer version was installed** — say so (include the old → new version if the output shows it), then tell me I must **fully quit and reopen Claude Code in a fresh session** (not `--continue`) for the new hooks to take effect — they only load at launch.
-- **If it was already up to date** — just tell me I'm on the latest; no restart needed.
-
-Run only those two commands; don't change anything else.
+The update above has already run; its output is the complete result. Show me that output exactly
+as written, then stop. Don't add to it, don't retry it, and don't run any other command.
