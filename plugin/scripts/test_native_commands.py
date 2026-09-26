@@ -270,5 +270,33 @@ subprocess.run([sys.executable, inst, "--uninstall"], env=env(), capture_output=
 check("cursor uninstall: removes all four commands", not any(os.path.exists(os.path.join(cdir, n))
       for n in ("catchup.md", "upgrade.md", "assertion-login.md", "assertion-space.md")))
 
+# ---- 10. no SessionStart (plugin turned on by /reload-plugins): the first prompt covers it -----
+def prompt(payload, **extra):
+    p = subprocess.run([sys.executable, os.path.join(HERE, "userpromptsubmit_delta.py")], input=json.dumps(payload),
+                       env=env(**extra), capture_output=True, text=True, timeout=30)
+    return json.loads(p.stdout) if p.stdout.strip() else {}
+ctx = lambda o: (o.get("hookSpecificOutput") or {}).get("additionalContext", "")
+reset_home()
+sid = "reload-" + secrets.token_hex(6)
+first = prompt({"session_id": sid, "prompt": "hi"}, ASSERTION_API_KEY=KEY)
+check("reload, signed in: first prompt carries the working set", "<persistent_project_memory>" in ctx(first) and "## memory" in ctx(first), json.dumps(first)[:300])
+check("reload, signed in: only once", "<persistent_project_memory>" not in ctx(prompt({"session_id": sid, "prompt": "again"}, ASSERTION_API_KEY=KEY)))
+sid = "normal-" + secrets.token_hex(6)
+hook({"source": "startup", "session_id": sid}, ASSERTION_API_KEY=KEY)
+check("normal start: SessionStart already injected, the first prompt does not repeat it",
+      "<persistent_project_memory>" not in ctx(prompt({"session_id": sid, "prompt": "hi"}, ASSERTION_API_KEY=KEY)))
+sid = "reload-out-" + secrets.token_hex(6)
+check("reload, signed out: first prompt says memory is off", prompt({"session_id": sid, "prompt": "hi"}).get("systemMessage") == "Assertion memory is off — run /assertion:login to turn it on.")
+check("reload, signed out: said once, not every prompt", prompt({"session_id": sid, "prompt": "again"}) == {})
+check("reload, then sign in: the next prompt brings the working set", "## memory" in ctx(prompt({"session_id": sid, "prompt": "go"}, ASSERTION_API_KEY=KEY)))
+sid = "start-out-" + secrets.token_hex(6)
+hook({"source": "startup", "session_id": sid})
+check("signed out at start: the prompt hook does not repeat the notice", prompt({"session_id": sid, "prompt": "hi"}) == {})
+check("signed out at start, signed in since: the next prompt brings the working set",
+      "## memory" in ctx(prompt({"session_id": sid, "prompt": "go"}, ASSERTION_API_KEY=KEY)))
+check("Cursor: no first-prompt working set (it has its own delivery)",
+      not os.path.exists(os.path.join(HOME, "proj", ".cursor")) and
+      prompt({"conversation_id": "cur-" + secrets.token_hex(6), "cursor_version": "1.7", "prompt": "hi"}, ASSERTION_API_KEY=KEY) == {"continue": True})
+
 srv.shutdown()
 print("ALL PASS" if not fails else f"{fails} FAILED"); sys.exit(1 if fails else 0)

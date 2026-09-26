@@ -47,6 +47,27 @@ def _mark_compaction(sid) -> None:
 SIGNED_OUT = "Assertion memory is off — run /assertion:login to turn it on."
 
 
+def _note_session(payload: dict, **fields) -> None:
+    """Merge flags into the session's state file, which the per-prompt hook reads. It is how that
+    hook knows whether this hook ran and injected the working set: a plugin installed mid-session
+    and turned on with /reload-plugins, or a sign-in after the session started, never reaches
+    SessionStart, so the first prompt delivers what this hook would have. Best-effort."""
+    if payload.get("cursor_version"):
+        return
+    try:
+        s = payload.get("session_id") or payload.get("conversation_id") or "default"
+        safe = "".join(c for c in str(s) if c.isalnum() or c in "-_")[:64] or "default"
+        p = os.path.join(tempfile.gettempdir(), f"assertion_session_{safe}.json")
+        try:
+            st = json.load(open(p)) or {}
+        except Exception:
+            st = {}
+        st.update(fields)
+        json.dump(st, open(p, "w"))
+    except Exception:
+        pass
+
+
 def _signed_out(payload: dict) -> None:
     """No key on this machine: say so where the user will see it, once per session start, instead
     of staying silent (the old behaviour, which left people unsure whether memory was working).
@@ -75,6 +96,7 @@ def main() -> int:
                 payload = json.loads(raw) or {}
         except Exception:
             payload = {}
+        _note_session(payload, session_start_ran=True)
 
         base = _creds.server_url()
         key = _creds.api_key()
@@ -92,6 +114,7 @@ def main() -> int:
 
         if not text:
             return 0
+        _note_session(payload, ws_injected=True)
 
         context = (
             "<persistent_project_memory>\n"

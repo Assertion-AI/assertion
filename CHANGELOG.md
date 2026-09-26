@@ -14,6 +14,10 @@ becomes a GitHub release when it reaches `main`.
   existing Cursor or Codex setup. `ASSERTION_API_KEY` still works and still takes precedence.
 - Until you sign in, each session starts with a one-line notice that memory is off and how to turn
   it on. Before, it stayed silent.
+- Installing the plugin inside a running Claude Code session needs no new session: run
+  `/reload-plugins`. That doesn't count as a session start, so your first message now brings what
+  session start would have (the project memory summary, or the signed-out notice), once. The same
+  applies when you sign in after a session has started.
 - `/assertion:space` and `/assertion:upgrade` run as scripts instead of instructions the assistant
   interprets, so they do the same thing every time. `/assertion:space <name>` switches this session
   at once (naming the space is the confirmation), and says who else can see it and how to undo.
