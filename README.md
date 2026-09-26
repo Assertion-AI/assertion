@@ -40,7 +40,7 @@ memory tools connect over HTTP.
 > `{"env": {"ASSERTION_API_KEY": "<key>"}}` rather than a shell `export`, so it reaches the plugin
 > however you launch Claude Code.
 >
-> **Upgrading:** run `/assertion:upgrade`, then start a fresh session.
+> **Upgrading:** run `/assertion:upgrade`, then `/reload-plugins`. No restart needed.
 >
 > **Spaces:** `/assertion:space` lists your memory spaces and shows which one this session uses;
 > `/assertion:space <name>` switches this session only (`/assertion:space personal` to go back).

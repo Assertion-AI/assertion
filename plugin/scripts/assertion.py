@@ -659,7 +659,7 @@ def _upgrade_claude() -> int:
     for p, old, new in changed:
         print(f"Updated {p} from {old} to {new}.")
     if changed:
-        print("Fully quit Claude Code and start a fresh session (not --continue) so the new version loads.")
+        print("Run /reload-plugins to load the new version in this session. No restart needed.")
     else:
         print(f"Already on the latest version ({', '.join(sorted(set(before.values())))}). Nothing to do.")
     if len(before) > 1:
