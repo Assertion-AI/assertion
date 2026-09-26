@@ -17,20 +17,23 @@ need an API key.
 
 ## Install (works in the Codex CLI and the VS Code extension)
 
-Run this. It prompts for your API key and does everything else:
+Run this. It signs you in in your browser (click **Connect**; no key to copy) and does
+everything else:
 
 ```bash
 python3 install_codex.py
 ```
 
-Then start Codex once and press **`t`** to trust the hooks:
+Then start Codex once and choose **Trust all and continue** when it asks you to review the hooks:
 
 ```bash
 codex
 ```
 
-That's the whole install. Codex shows a **Trust** dialog listing the
-SessionStart / UserPromptSubmit / Stop hooks — `t` trusts all three, then quit.
+That's the whole install. Codex shows a **Hooks need review** dialog for the
+SessionStart / UserPromptSubmit / Stop hooks — **Trust all and continue** trusts all three, then quit.
+(Already in a Codex session? Run `/hooks`, press **`t`** to trust all, then `/new`: the hooks,
+memory tools and skills all load without quitting.)
 Required once, and it is the one step no installer can do for you: Codex has no
 `--trust` flag, and the trusted-hash format is internal, so the installer does not
 forge it. Afterwards the hooks run automatically, in the terminal CLI and the
@@ -88,6 +91,17 @@ If `codex: command not found`, it is installed but not on your `PATH` — use
 `~/.local/bin/codex`, or let the installer fix it.
 
 </details>
+
+## Upgrade
+
+Ask Codex to "update Assertion" (the `assertion-upgrade` skill). Capture and the memory tools keep
+working in sessions that are already open: the hooks run through `~/.assertion/bin/codex-hook`,
+which always starts the newest installed version, so the update doesn't pull the scripts out from
+under an open session. Quit and reopen Codex when it suits you to load the new version's skills
+(sign-in, spaces, upgrade); `/new` is not enough for those.
+
+Coming from 0.3.7 or earlier? That one update changes how the hooks start: sessions that are
+already open stop capturing until Codex restarts, and Codex asks you once to trust the hooks again.
 
 ## Verify
 - `recall` returns nodes from your `default` tree (the same memory you see elsewhere).

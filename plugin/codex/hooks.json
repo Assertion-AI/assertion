@@ -4,21 +4,30 @@
       {
         "matcher": "startup|resume|clear|compact",
         "hooks": [
-          { "type": "command", "command": "python3 \"${ASSERTION_SCRIPTS_DIR:-${CLAUDE_PLUGIN_ROOT:-$PLUGIN_ROOT}/scripts}/sessionstart_inject.py\"" }
+          {
+            "type": "command",
+            "command": "L=\"$HOME/.assertion/bin/codex-hook\"; [ -f \"$L\" ] || L=\"${CLAUDE_PLUGIN_ROOT:-$PLUGIN_ROOT}/scripts/codex_hook.py\"; [ -f \"$L\" ] || exit 0; exec python3 \"$L\" sessionstart_inject.py"
+          }
         ]
       }
     ],
     "UserPromptSubmit": [
       {
         "hooks": [
-          { "type": "command", "command": "python3 \"${ASSERTION_SCRIPTS_DIR:-${CLAUDE_PLUGIN_ROOT:-$PLUGIN_ROOT}/scripts}/userpromptsubmit_delta.py\"" }
+          {
+            "type": "command",
+            "command": "L=\"$HOME/.assertion/bin/codex-hook\"; [ -f \"$L\" ] || L=\"${CLAUDE_PLUGIN_ROOT:-$PLUGIN_ROOT}/scripts/codex_hook.py\"; [ -f \"$L\" ] || exit 0; exec python3 \"$L\" userpromptsubmit_delta.py"
+          }
         ]
       }
     ],
     "Stop": [
       {
         "hooks": [
-          { "type": "command", "command": "python3 \"${ASSERTION_SCRIPTS_DIR:-${CLAUDE_PLUGIN_ROOT:-$PLUGIN_ROOT}/scripts}/hook_on_stop.py\"" }
+          {
+            "type": "command",
+            "command": "L=\"$HOME/.assertion/bin/codex-hook\"; [ -f \"$L\" ] || L=\"${CLAUDE_PLUGIN_ROOT:-$PLUGIN_ROOT}/scripts/codex_hook.py\"; [ -f \"$L\" ] || exit 0; exec python3 \"$L\" hook_on_stop.py"
+          }
         ]
       }
     ]

@@ -11,7 +11,7 @@ into existing Cursor config (won't clobber other hooks/MCP servers), is safe to 
 (idempotent), and backs up any file it changes.
 
 Usage:
-  python3 install_cursor.py                       # prompts for the API key
+  python3 install_cursor.py                       # signs you in in the browser
   python3 install_cursor.py --key sk-...           # non-interactive
   python3 install_cursor.py --workspace my-ws      # different tree
   python3 install_cursor.py --server https://...   # point at a non-prod backend
@@ -34,6 +34,7 @@ CURSOR_MCP = os.path.join(HOME, ".cursor", "mcp.json")
 CURSOR_COMMANDS = os.path.join(HOME, ".cursor", "commands")
 PROD = "https://memory.assertion-ai.com"
 SCRIPT_NAMES = ("sessionstart_inject.py", "userpromptsubmit_delta.py", "hook_on_stop.py", "hook_on_compact.py")
+COMMAND_NAMES = ("catchup.md", "upgrade.md", "assertion-login.md", "assertion-space.md")
 
 
 def _scripts_dir() -> str:
@@ -67,18 +68,62 @@ def _backup(path: str) -> None:
     if os.path.exists(path):
         bak = f"{path}.bak.{int(time.time())}"
         shutil.copy2(path, bak)
+        os.chmod(bak, 0o600)  # a backup of a key file is a key file
         print(f"  backed up {path} -> {bak}")
 
 
 def _write_json(path: str, data: dict) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2)
+    if path in (CREDS, CURSOR_MCP):
+        # Both hold the key: owner-only from the moment the file exists.
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as f:
+            json.dump(data, f, indent=2)
+        os.chmod(path, 0o600)
+    else:
+        with open(path, "w") as f:
+            json.dump(data, f, indent=2)
     print(f"  wrote {path}")
 
 
 def _is_ours(cmd: str) -> bool:
     return any(name in cmd for name in SCRIPT_NAMES)
+
+
+def install_commands(scripts: str, py: str) -> None:
+    """Copy our slash commands into ~/.cursor/commands. Cursor commands are plain prompts, so the
+    ones that run a script get this clone's absolute path written in: that is how /upgrade knows
+    which clone to pull, and how /assertion-login and /assertion-space find the script."""
+    src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "commands")
+    runner = f'"{py}" "{os.path.join(scripts, "assertion.py")}"'
+    os.makedirs(CURSOR_COMMANDS, exist_ok=True)
+    for name in COMMAND_NAMES:
+        path = os.path.join(src, name)
+        if not os.path.exists(path):
+            continue
+        with open(path) as f:
+            text = f.read().replace("{{ASSERTION}}", runner)
+        dst = os.path.join(CURSOR_COMMANDS, name)
+        with open(dst, "w") as f:
+            f.write(text)
+        print(f"  wrote {dst}")
+
+
+def sign_in() -> str:
+    """No key given: sign in in the browser (plugin/scripts/assertion.py), exactly as
+    /assertion-login does, and return the key it saved. Empty string if it didn't finish."""
+    sys.path.insert(0, _scripts_dir())
+    try:
+        import assertion as _a
+    except Exception as e:
+        print(f"  browser sign-in unavailable ({e})")
+        return ""
+    st = _a.obtain_key("cursor", wait=_a.LOGIN_TTL)
+    if st.get("status") != "approved":
+        print(f"  sign-in did not finish: {st.get('message') or st.get('status')}")
+        return ""
+    print(f"  signed in{' as ' + st['email'] if st.get('email') else ''}")
+    return (_load_json(CREDS).get("api_key") or "").strip()
 
 
 def install(key: str, server: str, workspace: str) -> None:
@@ -126,12 +171,8 @@ def install(key: str, server: str, workspace: str) -> None:
     _backup(CURSOR_MCP)
     _write_json(CURSOR_MCP, mcp)
 
-    # 4) /catchup slash command — copy our command into the global Cursor commands dir.
-    src_cmd = os.path.join(os.path.dirname(os.path.abspath(__file__)), "commands", "catchup.md")
-    if os.path.exists(src_cmd):
-        os.makedirs(CURSOR_COMMANDS, exist_ok=True)
-        shutil.copy2(src_cmd, os.path.join(CURSOR_COMMANDS, "catchup.md"))
-        print(f"  wrote {os.path.join(CURSOR_COMMANDS, 'catchup.md')}")
+    # 4) slash commands — into the global Cursor commands dir.
+    install_commands(scripts, py)
 
     print("\n✅ Installed. Just:")
     print("  1. Fully quit and reopen Cursor (it loads the hooks + MCP server on launch).")
@@ -139,7 +180,8 @@ def install(key: str, server: str, workspace: str) -> None:
     print("     and capture + memory injection run automatically (no enable/Get step).")
     print("     If Cursor asks you to trust the hooks, approve them.")
     print("  Verify anytime: ask \"recall <a topic you've worked on>\".")
-    print("  Tip: type /catchup (optionally with a topic or node id) for a grounded catch-up.")
+    print("  Tip: type /catchup (optionally with a topic or node id) for a grounded catch-up,")
+    print("  /assertion-space to see or switch memory spaces, and /upgrade to update the plugin.")
 
 
 def uninstall(server: str, workspace: str) -> None:
@@ -165,10 +207,11 @@ def uninstall(server: str, workspace: str) -> None:
         del mcp["mcpServers"]["assertion"]
         _backup(CURSOR_MCP)
         _write_json(CURSOR_MCP, mcp)
-    cmd_path = os.path.join(CURSOR_COMMANDS, "catchup.md")
-    if os.path.exists(cmd_path):
-        os.remove(cmd_path)
-        print(f"  removed {cmd_path}")
+    for name in COMMAND_NAMES:
+        cmd_path = os.path.join(CURSOR_COMMANDS, name)
+        if os.path.exists(cmd_path):
+            os.remove(cmd_path)
+            print(f"  removed {cmd_path}")
     print("\n✅ Removed Assertion hooks + MCP server from Cursor config. "
           "Your key in ~/.assertion/credentials.json was left in place; delete it manually if you want.")
 
@@ -179,21 +222,29 @@ def main() -> int:
     ap.add_argument("--server", default=PROD, help=f"backend base URL (default {PROD})")
     ap.add_argument("--workspace", default="default", help="workspace / tree (default: default)")
     ap.add_argument("--uninstall", action="store_true", help="remove what this installer added")
+    ap.add_argument("--commands-only", action="store_true",
+                    help="only refresh the slash commands (run by /upgrade after a pull)")
     args = ap.parse_args()
 
     if args.uninstall:
         uninstall(args.server, args.workspace)
         return 0
+    if args.commands_only:
+        install_commands(_scripts_dir(), _pick_python())
+        return 0
 
     key = args.key or os.environ.get("ASSERTION_API_KEY") or ""
     if not key:
+        print("Signing in to Assertion in your browser (no key to copy)...")
+        key = sign_in()
+    if not key:
         try:
-            key = getpass.getpass("Assertion API key (get it at https://assertion-ai.com): ").strip()
+            key = getpass.getpass("Or paste an Assertion API key (from https://studio.assertion-ai.com/connect): ").strip()
         except (EOFError, KeyboardInterrupt):
             print()
             return 1
     if not key:
-        sys.exit("error: no API key provided.")
+        sys.exit("error: not signed in.")
 
     install(key, args.server.rstrip("/"), args.workspace)
     return 0

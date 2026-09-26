@@ -106,3 +106,58 @@ def install_source() -> str:
             name = "".join(c for c in parts[i + 2].lower() if c.isalnum() or c in "-_.")[:40]
             return name
     return ""
+
+
+def credentials_file() -> str:
+    """Where a sign-in saves the key: the first file _file() reads."""
+    return os.path.expanduser(_FILES[0])
+
+
+def write_private(path: str, text: str) -> None:
+    """Write a file that holds a key: created 0600 from the outset (a write-then-chmod leaves a
+    window where the default umask made it readable), replaced atomically so a crash mid-write
+    never leaves half a config behind."""
+    d = os.path.dirname(path)
+    os.makedirs(d, exist_ok=True)
+    tmp = os.path.join(d, f".{os.path.basename(path)}.{os.getpid()}.tmp")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(text)
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def save_api_key(key: str, email: str | None = None) -> str:
+    """Save a signed-in key to the credentials file, keeping any other fields in it. Returns the path."""
+    global _CACHE
+    path = credentials_file()
+    try:
+        with open(path) as f:
+            d = json.load(f)
+        d = d if isinstance(d, dict) else {}
+    except Exception:
+        d = {}
+    d["api_key"] = key
+    if email:
+        d["email"] = email
+    write_private(path, json.dumps(d, indent=2) + "\n")
+    _CACHE = None
+    return path
+
+
+def mcp_headers() -> dict:
+    """Headers for the MCP server, exactly what plugin/.mcp.json used to template from the
+    environment (`x-api-key: ${ASSERTION_API_KEY}`, `X-Assertion-Workspace:
+    ${ASSERTION_WORKSPACE:-default}`), now with the credentials file behind the environment.
+    Empty when there is no key, so the server answers discovery and refuses tool calls."""
+    key = api_key()
+    if not key:
+        return {}
+    return {"x-api-key": key, "X-Assertion-Workspace": workspace()}

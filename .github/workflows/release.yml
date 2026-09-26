@@ -48,6 +48,10 @@ jobs:
           with open(os.environ["GITHUB_OUTPUT"], "a") as out:
               out.write(f"version={version}\n")
           PY
+      - name: Plugin script tests (offline)
+        run: |
+          python3 plugin/scripts/test_install_source.py
+          python3 plugin/scripts/test_native_commands.py
 
   release:
     needs: check

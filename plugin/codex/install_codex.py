@@ -20,7 +20,7 @@ and undocumented, so this installer does not forge it — it prints the exact
 remaining action instead.
 
 Usage:
-  python3 install_codex.py                       # prompts for the API key
+  python3 install_codex.py                       # signs you in in the browser
   python3 install_codex.py --key sk-...          # non-interactive
   python3 install_codex.py --workspace my-ws     # different tree
   python3 install_codex.py --server https://...  # point at a non-prod backend
@@ -43,6 +43,9 @@ import time
 HOME = os.path.expanduser("~")
 CREDS = os.path.join(HOME, ".assertion", "credentials.json")
 CODEX_CONFIG = os.path.join(HOME, ".codex", "config.toml")
+# The hooks run through this copy of scripts/codex_hook.py, outside Codex's versioned plugin cache,
+# so a plugin update can't pull the hook scripts out from under a session that is already open.
+HOOK_LAUNCHER = os.path.join(HOME, ".assertion", "bin", "codex-hook")
 PROD = "https://memory.assertion-ai.com"
 MARKETPLACE_SOURCE = "https://github.com/Assertion-AI/assertion.git"
 PLUGIN_NAME = "assertion"
@@ -354,7 +357,7 @@ def launch_codex(codex: str) -> None:
         fd = os.open("/dev/tty", os.O_RDWR)
     except OSError:
         print("\n   No terminal detected, so I can't open the trust dialog for you.")
-        print(f"   Run this, press 't' to trust all, then quit:\n\n     {codex}\n")
+        print(f"   Run this, choose 'Trust all and continue', then quit:\n\n     {codex}\n")
         return
     try:
         os.dup2(fd, 0)
@@ -365,7 +368,7 @@ def launch_codex(codex: str) -> None:
         os.execv(codex, [codex])
     except OSError as exc:
         print(f"\n   Could not launch Codex ({exc}).")
-        print(f"   Run this, press 't' to trust all, then quit:\n\n     {codex}\n")
+        print(f"   Run this, choose 'Trust all and continue', then quit:\n\n     {codex}\n")
 
 
 def install(key: str, server: str, workspace: str, source: str, path_fix: bool,
@@ -388,6 +391,7 @@ def install(key: str, server: str, workspace: str, source: str, path_fix: bool,
 
     print("3/5 plugin")
     ensure_plugin(codex, marketplace)
+    install_hook_launcher()
 
     print("4/5 credentials")
     write_creds(key, server)
@@ -397,15 +401,17 @@ def install(key: str, server: str, workspace: str, source: str, path_fix: bool,
 
     invoke = "codex" if (on_path or path_fix) else codex
     print("\n✅ Installed. One step left, and only you can do it.\n")
-    print("   Codex is about to open and show a Trust dialog listing three hooks —")
+    print("   Codex is about to open and ask you to review three hooks —")
     print("   SessionStart, UserPromptSubmit and Stop.")
-    print("\n     >>> Press 't' to trust all, then quit. <<<\n")
+    print("\n     >>> Choose 'Trust all and continue', then quit. <<<\n")
     print("   Required once. Codex has no flag for this and the trust hash is")
     print("   internal, so no installer can grant it for you.")
     print("\n   Afterwards, capture and memory injection run automatically in the CLI,")
     print("   the desktop app and the VS Code panel alike.")
     print("   Verify with: recall <a topic you've worked on>")
     print("   Tip: /catchup for a grounded catch-up on recent work.")
+    print("\n   Already have a Codex session open? In it, run /hooks and press 't' to")
+    print("   trust all, then /new. No need to quit.")
     print("\n   NOTE: if you use the ChatGPT desktop app, fully quit (Cmd-Q) and")
     print("   reopen it after this. It reads config only at launch, so Settings ->")
     print("   Hooks stays empty until you restart even though trust succeeded.")
@@ -415,6 +421,18 @@ def install(key: str, server: str, workspace: str, source: str, path_fix: bool,
         launch_codex(codex)
     else:
         print(f"\n   Then run: {invoke}\n")
+
+
+def install_hook_launcher() -> None:
+    """Put the stable hook launcher in place now (the hooks would also install it on first run)."""
+    src = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts", "codex_hook.py")
+    try:
+        sys.path.insert(0, os.path.dirname(src))
+        import codex_hook
+        codex_hook.refresh_stable(src)
+        print(f"  hook launcher at {HOOK_LAUNCHER}")
+    except Exception as e:
+        print(f"  could not write the hook launcher ({e}); the hooks will install it on first run")
 
 
 def uninstall(source: str) -> None:
@@ -437,10 +455,33 @@ def uninstall(source: str) -> None:
             os.chmod(CODEX_CONFIG, 0o600)
             print(f"  removed [{MCP_SECTION}] from {CODEX_CONFIG}")
 
+    if os.path.exists(HOOK_LAUNCHER):
+        os.remove(HOOK_LAUNCHER)
+        print(f"  removed {HOOK_LAUNCHER}")
+
     print("\n✅ Removed the Assertion plugin and MCP server from Codex.")
     print(f"   Left in place on purpose: your key at {CREDS}, the registered")
     print("   marketplace, and the PATH line in your shell profile. Delete those")
     print("   by hand if you want them gone.")
+
+
+def sign_in() -> str:
+    """No key given: sign in in the browser with the plugin's own sign-in (plugin/scripts/
+    assertion.py, the same one the assertion-login skill runs) and return the key it saved.
+    Empty string if it didn't finish, or if this file was run outside a clone of the repo."""
+    scripts = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
+    sys.path.insert(0, scripts)
+    try:
+        import assertion as _a
+    except Exception as e:
+        print(f"  browser sign-in unavailable ({e})")
+        return ""
+    st = _a.obtain_key("codex", wait=_a.LOGIN_TTL)
+    if st.get("status") != "approved":
+        print(f"  sign-in did not finish: {st.get('message') or st.get('status')}")
+        return ""
+    print(f"  signed in{' as ' + st['email'] if st.get('email') else ''}")
+    return (load_json(CREDS).get("api_key") or "").strip()
 
 
 def main() -> int:
@@ -464,13 +505,16 @@ def main() -> int:
 
     key = args.key or os.environ.get("ASSERTION_API_KEY") or ""
     if not key:
+        print("Signing in to Assertion in your browser (no key to copy)...")
+        key = sign_in()
+    if not key:
         try:
-            key = getpass.getpass("Assertion API key (get it at https://assertion-ai.com): ").strip()
+            key = getpass.getpass("Or paste an Assertion API key (from https://studio.assertion-ai.com/connect): ").strip()
         except (EOFError, KeyboardInterrupt):
             print()
             return 1
     if not key:
-        sys.exit("error: no API key provided.")
+        sys.exit("error: not signed in.")
 
     install(key, args.server.rstrip("/"), args.workspace,
             args.marketplace_source, not args.no_path_fix,

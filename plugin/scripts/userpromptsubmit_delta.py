@@ -33,6 +33,10 @@ _BASE = _creds.server_url()
 _KEY = _creds.api_key()
 _PREFIX = _creds.path_prefix()
 _WS = _creds.workspace()
+# Codex gets its own session-start flow; the first-prompt fallback below is for Claude Code, where
+# /reload-plugins turns a new plugin on without a SessionStart.
+_IS_CODEX = "/.codex/" in os.path.abspath(__file__).replace(os.sep, "/")
+SIGNED_OUT = "Assertion memory is off — run /assertion:login to turn it on."
 
 
 def _state_path(session_id: str) -> str:
@@ -168,9 +172,6 @@ def main() -> int:
                            or os.environ.get("CLAUDE_PROJECT_DIR"))
         except Exception:
             pass
-        if not _BASE or not _KEY:
-            return 0
-
         sp = _state_path(session_id)
         state = {}
         try:
@@ -178,6 +179,19 @@ def main() -> int:
                 state = json.load(f) or {}
         except Exception:
             state = {}
+        # SessionStart never ran for this session (the plugin was installed and turned on with
+        # /reload-plugins): the first prompt delivers what it would have — the signed-out notice
+        # here, the working set below.
+        fallback = not is_cursor and not _IS_CODEX
+        if not _BASE or not _KEY:
+            if fallback and not state.get("session_start_ran") and not state.get("signed_out_shown"):
+                try:
+                    with open(sp, "w") as f:
+                        json.dump({**state, "signed_out_shown": True}, f)
+                except Exception:
+                    pass
+                sys.stdout.write(json.dumps({"systemMessage": SIGNED_OUT}))
+            return 0
         last = state.get("last_seen_turn")
         focus = state.get("focus")
         lenses = state.get("lenses") or {}   # anchor_id -> ancestor_path
@@ -200,7 +214,12 @@ def main() -> int:
         # recall) share no inputs or outputs, so fire both concurrently — the per-prompt hook then
         # waits ~max(delta, search) instead of the sum. Blocking urllib calls release the GIL during
         # the network wait, so threads parallelize fine. stdlib-only (concurrent.futures).
-        _pool = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+        # No working set yet this session (no SessionStart, or signed out when it ran and signed in
+        # since): fetch it alongside the others. Only on the session's first synced prompt, so a
+        # session that predates this version never gets a mid-session re-injection.
+        need_ws = fallback and last is None and not state.get("ws_injected")
+        _pool = concurrent.futures.ThreadPoolExecutor(max_workers=3)
+        _ws_fut = _pool.submit(_get, "/working-set") if need_ws else None
         _search_fut = (_pool.submit(_get_json, "/search?" + urllib.parse.urlencode(
                            {"q": _recall_query(prompt, transcript_path), **_extra}))
                        if prompt.strip() else None)
@@ -277,7 +296,21 @@ def main() -> int:
                     recall_seeds = [(r["id"], r.get("claim") or "") for r in results]
             except Exception as e:
                 recall_error = (str(e) or "error")[:80]
-        _pool.shutdown(wait=False)   # both futures consumed (delta above, search here)
+        ws_injected = bool(state.get("ws_injected"))
+        if _ws_fut is not None:
+            try:
+                ws_md = _ws_fut.result().strip()
+                if ws_md:
+                    sections.insert(0,
+                        "<persistent_project_memory>\n"
+                        "Shared, structured memory of this project's work, accumulated across "
+                        "sessions and teammates. Treat it as background you already know; cite "
+                        "node ids like [n0042] and use the memory tools to drill in.\n\n"
+                        + ws_md + "\n</persistent_project_memory>")
+                    ws_injected = True
+            except Exception:
+                pass
+        _pool.shutdown(wait=False)   # all futures consumed (delta above, search and working set here)
 
         # ---- C (fallback). ZOOM-IN write-following: anchor on the focus's PARENT and show its
         # children. Only when prompt-driven recall didn't fire (endpoint absent/empty). ----
@@ -391,6 +424,7 @@ def main() -> int:
                 st = {"last_seen_turn": current, "focus": focus, "lenses": lenses, "prompt": prompt,
                       "ws_note_shown": ws_note_shown, "last_space": last_space,
                       "restate_space": restate,
+                      "session_start_ran": bool(state.get("session_start_ran")), "ws_injected": ws_injected,
                       "upgrade_shown": bool(state.get("upgrade_shown")) or _show_upg,
                       "recall_surfaced": [sid for sid, _ in recall_seeds]}  # for the Stop-hook assist log
                 if is_cursor:
