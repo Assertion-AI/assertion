@@ -23,6 +23,12 @@ becomes a GitHub release when it reaches `main`.
   at once (naming the space is the confirmation), and says who else can see it and how to undo.
   Cursor gets `/assertion-space` and an `/upgrade` that pulls the exact clone it runs from; Codex
   gets `assertion-space` and `assertion-upgrade` skills.
+- Codex: updating the plugin no longer breaks capture in sessions that are already open. The hooks
+  now run through `~/.assertion/bin/codex-hook`, which starts the newest installed version, so
+  their commands stay the same from version to version (no new trust prompt on later updates).
+  Codex drops the old version's files on update, and before this every hook in an open session
+  failed until Codex restarted. Coming from 0.3.7 or earlier, this one update still needs a
+  restart and a one-time trust of the hooks.
 - Files that hold the key (`~/.assertion/credentials.json`, Cursor's `mcp.json`, Codex's
   `config.toml`) are written owner-only (0600).
 

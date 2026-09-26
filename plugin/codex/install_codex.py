@@ -43,6 +43,9 @@ import time
 HOME = os.path.expanduser("~")
 CREDS = os.path.join(HOME, ".assertion", "credentials.json")
 CODEX_CONFIG = os.path.join(HOME, ".codex", "config.toml")
+# The hooks run through this copy of scripts/codex_hook.py, outside Codex's versioned plugin cache,
+# so a plugin update can't pull the hook scripts out from under a session that is already open.
+HOOK_LAUNCHER = os.path.join(HOME, ".assertion", "bin", "codex-hook")
 PROD = "https://memory.assertion-ai.com"
 MARKETPLACE_SOURCE = "https://github.com/Assertion-AI/assertion.git"
 PLUGIN_NAME = "assertion"
@@ -388,6 +391,7 @@ def install(key: str, server: str, workspace: str, source: str, path_fix: bool,
 
     print("3/5 plugin")
     ensure_plugin(codex, marketplace)
+    install_hook_launcher()
 
     print("4/5 credentials")
     write_creds(key, server)
@@ -419,6 +423,18 @@ def install(key: str, server: str, workspace: str, source: str, path_fix: bool,
         print(f"\n   Then run: {invoke}\n")
 
 
+def install_hook_launcher() -> None:
+    """Put the stable hook launcher in place now (the hooks would also install it on first run)."""
+    src = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts", "codex_hook.py")
+    try:
+        sys.path.insert(0, os.path.dirname(src))
+        import codex_hook
+        codex_hook.refresh_stable(src)
+        print(f"  hook launcher at {HOOK_LAUNCHER}")
+    except Exception as e:
+        print(f"  could not write the hook launcher ({e}); the hooks will install it on first run")
+
+
 def uninstall(source: str) -> None:
     codex, _ = find_codex()
 
@@ -438,6 +454,10 @@ def uninstall(source: str) -> None:
                 f.write(cleaned.rstrip() + "\n")
             os.chmod(CODEX_CONFIG, 0o600)
             print(f"  removed [{MCP_SECTION}] from {CODEX_CONFIG}")
+
+    if os.path.exists(HOOK_LAUNCHER):
+        os.remove(HOOK_LAUNCHER)
+        print(f"  removed {HOOK_LAUNCHER}")
 
     print("\n✅ Removed the Assertion plugin and MCP server from Codex.")
     print(f"   Left in place on purpose: your key at {CREDS}, the registered")

@@ -723,6 +723,10 @@ def _upgrade_codex() -> int:
         return 1
     mkt = _creds.install_source() or "assertion-ai"
     old = _codex_cached_version(mkt) or _creds.plugin_version()
+    try:
+        import codex_hook   # before `plugin add`, which deletes this version's directory
+    except Exception:
+        codex_hook = None
     code, out = _run([codex, "plugin", "marketplace", "upgrade", mkt])
     if code != 0:
         print(f"Could not refresh the {mkt} marketplace: {out.strip()[-300:]}")
@@ -733,11 +737,19 @@ def _upgrade_codex() -> int:
         print(f"Could not update assertion@{mkt}: {out.strip()[-300:]}")
         return 1
     new = _codex_cached_version(mkt)
+    # Hooks run through ~/.assertion/bin/codex-hook, which each hook call keeps current; refresh it
+    # now too, so the new version's launcher is in place before the next hook fires.
+    try:
+        src = os.path.expanduser(f"~/.codex/plugins/cache/{mkt}/assertion/{new}/scripts/codex_hook.py")
+        if codex_hook and new and os.path.isfile(src):
+            codex_hook.refresh_stable(src)
+    except Exception:
+        pass
     if new and old and _vkey(new) > _vkey(old):
         print(f"Updated the Assertion plugin from {old} to {new}.")
-        print("Quit and reopen Codex now, including any other open Codex windows. The previous version's "
-              "files were replaced, so capture fails in sessions that are still open until they restart "
-              "(/new is not enough).")
+        print("Capture and the memory tools keep working in Codex sessions that are already open. "
+              "Quit and reopen Codex when it suits you to load the new version's skills (sign-in, spaces, "
+              "upgrade); /new is not enough for those.")
     else:
         print(f"Already on the latest version ({old or new or 'unknown'}). Nothing to do.")
     return 0

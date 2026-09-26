@@ -1,6 +1,6 @@
 """Sign-in, spaces and the MCP headers helper, offline: a fake backend on 127.0.0.1, a temp HOME,
 and the browser's part played by this test. Run: python3 plugin/scripts/test_native_commands.py"""
-import hashlib, base64, json, os, secrets, stat, subprocess, sys, tempfile, threading, time, urllib.parse, urllib.request
+import hashlib, base64, json, os, re, secrets, stat, subprocess, sys, tempfile, threading, time, urllib.parse, urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -297,6 +297,57 @@ check("signed out at start, signed in since: the next prompt brings the working 
 check("Cursor: no first-prompt working set (it has its own delivery)",
       not os.path.exists(os.path.join(HOME, "proj", ".cursor")) and
       prompt({"conversation_id": "cur-" + secrets.token_hex(6), "cursor_version": "1.7", "prompt": "hi"}, ASSERTION_API_KEY=KEY) == {"continue": True})
+
+# ---- 11. Codex hooks run through a stable launcher, so an upgrade can't break an open session --
+import shutil
+CX = os.path.join(HOME, "cx")                                  # a stand-in CODEX_HOME
+PARENT = os.path.join(CX, "plugins", "cache", "assertion-ai", "assertion")
+LAUNCHER = os.path.join(HOME, ".assertion", "bin", "codex-hook")
+REAL = open(os.path.join(HERE, "codex_hook.py")).read()
+def fake_version(v):
+    d = os.path.join(PARENT, v, "scripts"); os.makedirs(d, exist_ok=True)
+    open(os.path.join(d, "codex_hook.py"), "w").write(REAL + f"\n# version {v}\n")
+    for name in ("sessionstart_inject.py", "userpromptsubmit_delta.py", "hook_on_stop.py"):
+        open(os.path.join(d, name), "w").write(
+            "import os, sys\nprint(%r, os.environ.get('PLUGIN_ROOT'), sys.stdin.read(), sys.argv[1:])\n" % f"{name}@{v}")
+for v in ("0.3.8", "0.3.9", "0.3.10"):
+    fake_version(v)
+hooks = json.load(open(os.path.join(ROOT, "plugin", "codex", "hooks.json")))["hooks"]
+cmds = {ev: hooks[ev][0]["hooks"][0]["command"] for ev in ("SessionStart", "UserPromptSubmit", "Stop")}
+def run_hook(ev, plugin_root, stdin='{"hook_event_name": "x"}', **extra):
+    e = env(CODEX_HOME=CX, PLUGIN_ROOT=plugin_root, CLAUDE_PLUGIN_ROOT=plugin_root, **extra)
+    p = subprocess.run(["sh", "-c", cmds[ev]], input=stdin, env=e, capture_output=True, text=True, timeout=30)
+    return p.returncode, p.stdout.strip(), p.stderr.strip()
+check("codex hooks: no command names a version", not any(re.search(r"\d+\.\d+\.\d+", c) for c in cmds.values()))
+check("codex hooks: every command goes through the stable launcher",
+      all('$HOME/.assertion/bin/codex-hook' in c and c.endswith(s) for c, s in
+          zip(cmds.values(), ("sessionstart_inject.py", "userpromptsubmit_delta.py", "hook_on_stop.py"))))
+check("Claude Code hooks are unchanged (no launcher)", "codex-hook" not in open(os.path.join(ROOT, "plugin", "hooks", "hooks.json")).read())
+if os.path.exists(LAUNCHER): os.remove(LAUNCHER)
+rc, out, err = run_hook("SessionStart", os.path.join(PARENT, "0.3.9"))
+check("launcher: runs the NEWEST version (0.3.10 beats 0.3.9 and 0.3.8)", rc == 0 and out.startswith("sessionstart_inject.py@0.3.10"), out + err)
+check("launcher: passes stdin through", '{"hook_event_name": "x"}' in out, out)
+check("launcher: points PLUGIN_ROOT at the version it runs", os.path.join(PARENT, "0.3.10") in out, out)
+check("launcher: first run installs the stable copy, 0755, from the newest version",
+      os.path.exists(LAUNCHER) and mode(LAUNCHER) == 0o755 and "# version 0.3.10" in open(LAUNCHER).read())
+shutil.rmtree(os.path.join(PARENT, "0.3.9"))                  # the session's own version is gone (upgrade)
+rc, out, err = run_hook("Stop", os.path.join(PARENT, "0.3.9"))
+check("after an upgrade removes the session's version: the hook still runs, from the new version",
+      rc == 0 and out.startswith("hook_on_stop.py@0.3.10"), out + err)
+fake_version("0.3.11")
+rc, out, _ = run_hook("UserPromptSubmit", os.path.join(PARENT, "0.3.9"))
+check("a later version is picked up at call time, and refreshes the stable copy",
+      out.startswith("userpromptsubmit_delta.py@0.3.11") and "# version 0.3.11" in open(LAUNCHER).read(), out)
+rc, out, _ = run_hook("SessionStart", "", ASSERTION_SCRIPTS_DIR=os.path.join(PARENT, "0.3.8", "scripts"))
+check("ASSERTION_SCRIPTS_DIR still overrides", out.startswith("sessionstart_inject.py@0.3.8"), out)
+p = subprocess.run([sys.executable, LAUNCHER, "../../etc/x.py"], env=env(CODEX_HOME=CX), capture_output=True, text=True)
+check("launcher: refuses a script name that isn't a plain file name", p.returncode == 0 and not p.stdout)
+shutil.rmtree(CX)
+rc, out, err = run_hook("SessionStart", os.path.join(PARENT, "0.3.9"))
+check("launcher: nothing installed -> exits 0 silently (fail-open)", rc == 0 and out == "" and err == "", out + err)
+os.remove(LAUNCHER)
+rc, out, err = run_hook("SessionStart", "/nonexistent/0.3.7")
+check("no launcher and the plugin dir is gone -> exits 0 silently", rc == 0 and out == "" and err == "", out + err)
 
 srv.shutdown()
 print("ALL PASS" if not fails else f"{fails} FAILED"); sys.exit(1 if fails else 0)

@@ -94,10 +94,14 @@ If `codex: command not found`, it is installed but not on your `PATH` — use
 
 ## Upgrade
 
-Ask Codex to "update Assertion" (the `assertion-upgrade` skill). When it reports a new version,
-**quit and reopen Codex right away**, including any other open Codex windows: the update replaces
-the previous version's files, so capture fails in sessions that are still open until they restart.
-`/new` is not enough here.
+Ask Codex to "update Assertion" (the `assertion-upgrade` skill). Capture and the memory tools keep
+working in sessions that are already open: the hooks run through `~/.assertion/bin/codex-hook`,
+which always starts the newest installed version, so the update doesn't pull the scripts out from
+under an open session. Quit and reopen Codex when it suits you to load the new version's skills
+(sign-in, spaces, upgrade); `/new` is not enough for those.
+
+Coming from 0.3.7 or earlier? That one update changes how the hooks start: sessions that are
+already open stop capturing until Codex restarts, and Codex asks you once to trust the hooks again.
 
 ## Verify
 - `recall` returns nodes from your `default` tree (the same memory you see elsewhere).
