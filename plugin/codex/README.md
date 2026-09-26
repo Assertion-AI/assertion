@@ -17,7 +17,8 @@ need an API key.
 
 ## Install (works in the Codex CLI and the VS Code extension)
 
-Run this. It prompts for your API key and does everything else:
+Run this. It signs you in in your browser (click **Connect**; no key to copy) and does
+everything else:
 
 ```bash
 python3 install_codex.py

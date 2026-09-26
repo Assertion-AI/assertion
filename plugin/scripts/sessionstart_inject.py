@@ -44,6 +44,28 @@ def _mark_compaction(sid) -> None:
         pass
 
 
+SIGNED_OUT = "Assertion memory is off — run /assertion:login to turn it on."
+
+
+def _signed_out(payload: dict) -> None:
+    """No key on this machine: say so where the user will see it, once per session start, instead
+    of staying silent (the old behaviour, which left people unsure whether memory was working).
+    Claude Code renders `systemMessage`; Cursor's sessionStart can only add context, so the
+    assistant is asked to pass it on; Codex gets its own wording, since sign-in there is a skill."""
+    if (payload.get("source") or "").lower() == "compact":
+        return
+    if payload.get("cursor_version"):
+        sys.stdout.write(json.dumps({"additional_context": (
+            "Assertion memory is installed but this computer is not signed in, so memory is off. "
+            "In your first reply, tell the user once, in one short line: run /assertion-login to turn it on.")}))
+        return
+    if "/.codex/" in os.path.abspath(__file__).replace(os.sep, "/"):
+        msg = "Assertion memory is off — ask Codex to \"sign in to Assertion\" (the assertion-login skill) to turn it on."
+    else:
+        msg = SIGNED_OUT
+    sys.stdout.write(json.dumps({"systemMessage": msg}))
+
+
 def main() -> int:
     try:
         payload = {}
@@ -57,6 +79,7 @@ def main() -> int:
         base = _creds.server_url()
         key = _creds.api_key()
         if not base or not key:
+            _signed_out(payload)
             return 0
 
         prefix = _creds.path_prefix()

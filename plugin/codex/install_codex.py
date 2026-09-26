@@ -20,7 +20,7 @@ and undocumented, so this installer does not forge it — it prints the exact
 remaining action instead.
 
 Usage:
-  python3 install_codex.py                       # prompts for the API key
+  python3 install_codex.py                       # signs you in in the browser
   python3 install_codex.py --key sk-...          # non-interactive
   python3 install_codex.py --workspace my-ws     # different tree
   python3 install_codex.py --server https://...  # point at a non-prod backend
@@ -443,6 +443,25 @@ def uninstall(source: str) -> None:
     print("   by hand if you want them gone.")
 
 
+def sign_in() -> str:
+    """No key given: sign in in the browser with the plugin's own sign-in (plugin/scripts/
+    assertion.py, the same one the assertion-login skill runs) and return the key it saved.
+    Empty string if it didn't finish, or if this file was run outside a clone of the repo."""
+    scripts = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
+    sys.path.insert(0, scripts)
+    try:
+        import assertion as _a
+    except Exception as e:
+        print(f"  browser sign-in unavailable ({e})")
+        return ""
+    st = _a.obtain_key("codex", wait=_a.LOGIN_TTL)
+    if st.get("status") != "approved":
+        print(f"  sign-in did not finish: {st.get('message') or st.get('status')}")
+        return ""
+    print(f"  signed in{' as ' + st['email'] if st.get('email') else ''}")
+    return (load_json(CREDS).get("api_key") or "").strip()
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Set up Assertion memory for Codex.")
     ap.add_argument("--key", help="API key (else prompts / reads ASSERTION_API_KEY)")
@@ -464,13 +483,16 @@ def main() -> int:
 
     key = args.key or os.environ.get("ASSERTION_API_KEY") or ""
     if not key:
+        print("Signing in to Assertion in your browser (no key to copy)...")
+        key = sign_in()
+    if not key:
         try:
-            key = getpass.getpass("Assertion API key (get it at https://assertion-ai.com): ").strip()
+            key = getpass.getpass("Or paste an Assertion API key (from https://studio.assertion-ai.com/connect): ").strip()
         except (EOFError, KeyboardInterrupt):
             print()
             return 1
     if not key:
-        sys.exit("error: no API key provided.")
+        sys.exit("error: not signed in.")
 
     install(key, args.server.rstrip("/"), args.workspace,
             args.marketplace_source, not args.no_path_fix,

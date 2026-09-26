@@ -19,14 +19,17 @@ The rules file is generated — add `\.cursor/rules/assertion-memory.mdc` to you
 
 ## Install (one command)
 
-From this directory, run the installer and paste your key when prompted:
+From this directory, run the installer. It opens your browser to sign in (click **Connect**), so
+there is no key to copy:
 ```bash
 python3 install_cursor.py
 ```
-It writes your key to `~/.assertion/credentials.json`, adds the three hooks to
+It saves the sign-in to `~/.assertion/credentials.json`, adds the hooks to
 `~/.cursor/hooks.json`, and adds the recall/expand MCP server to `~/.cursor/mcp.json` —
 merging into any existing Cursor config (it won't touch your other hooks or MCP servers)
-and backing up anything it changes. Get your key at https://assertion-ai.com.
+and backing up anything it changes. It also adds four commands: `/catchup`, `/assertion-login`
+(sign in again), `/assertion-space` (list or switch memory spaces) and `/upgrade` (pull the latest
+version into this clone).
 
 Then **fully quit and reopen Cursor** — that's it. On launch Cursor loads what the script
 wrote: the `assertion` server appears under **Settings → Tools & MCPs**, and the hooks

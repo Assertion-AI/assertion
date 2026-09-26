@@ -3,6 +3,25 @@
 Notable changes to the Assertion plugin for Claude Code, Cursor and Codex. Each version here
 becomes a GitHub release when it reaches `main`.
 
+## [0.3.8] — 2026-09-25
+
+- Sign in with `/assertion:login`: your browser opens, you click Connect, and memory is on. There is
+  no key to copy, and in Claude Code no restart: the memory tools read the sign-in through a
+  headers helper, and capture reads the same file. Cursor (`/assertion-login`) and Codex (the
+  `assertion-login` skill) sign in the same way, and both installers now sign you in instead of
+  asking for a key. On a machine with no browser, `/assertion:login code` uses a short code
+  instead. One sign-in covers every client on this machine: it also refreshes the key in an
+  existing Cursor or Codex setup. `ASSERTION_API_KEY` still works and still takes precedence.
+- Until you sign in, each session starts with a one-line notice that memory is off and how to turn
+  it on. Before, it stayed silent.
+- `/assertion:space` and `/assertion:upgrade` run as scripts instead of instructions the assistant
+  interprets, so they do the same thing every time. `/assertion:space <name>` switches this session
+  at once (naming the space is the confirmation), and says who else can see it and how to undo.
+  Cursor gets `/assertion-space` and an `/upgrade` that pulls the exact clone it runs from; Codex
+  gets `assertion-space` and `assertion-upgrade` skills.
+- Files that hold the key (`~/.assertion/credentials.json`, Cursor's `mcp.json`, Codex's
+  `config.toml`) are written owner-only (0600).
+
 ## [0.3.7] — 2026-09-23
 
 - Each capture also reports which copy of the plugin is installed: the name of the marketplace it
