@@ -24,14 +24,16 @@ everything else:
 python3 install_codex.py
 ```
 
-Then start Codex once and press **`t`** to trust the hooks:
+Then start Codex once and choose **Trust all and continue** when it asks you to review the hooks:
 
 ```bash
 codex
 ```
 
-That's the whole install. Codex shows a **Trust** dialog listing the
-SessionStart / UserPromptSubmit / Stop hooks — `t` trusts all three, then quit.
+That's the whole install. Codex shows a **Hooks need review** dialog for the
+SessionStart / UserPromptSubmit / Stop hooks — **Trust all and continue** trusts all three, then quit.
+(Already in a Codex session? Run `/hooks`, press **`t`** to trust all, then `/new`: the hooks,
+memory tools and skills all load without quitting.)
 Required once, and it is the one step no installer can do for you: Codex has no
 `--trust` flag, and the trusted-hash format is internal, so the installer does not
 forge it. Afterwards the hooks run automatically, in the terminal CLI and the
@@ -89,6 +91,13 @@ If `codex: command not found`, it is installed but not on your `PATH` — use
 `~/.local/bin/codex`, or let the installer fix it.
 
 </details>
+
+## Upgrade
+
+Ask Codex to "update Assertion" (the `assertion-upgrade` skill). When it reports a new version,
+**quit and reopen Codex right away**, including any other open Codex windows: the update replaces
+the previous version's files, so capture fails in sessions that are still open until they restart.
+`/new` is not enough here.
 
 ## Verify
 - `recall` returns nodes from your `default` tree (the same memory you see elsewhere).

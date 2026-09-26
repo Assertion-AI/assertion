@@ -354,7 +354,7 @@ def launch_codex(codex: str) -> None:
         fd = os.open("/dev/tty", os.O_RDWR)
     except OSError:
         print("\n   No terminal detected, so I can't open the trust dialog for you.")
-        print(f"   Run this, press 't' to trust all, then quit:\n\n     {codex}\n")
+        print(f"   Run this, choose 'Trust all and continue', then quit:\n\n     {codex}\n")
         return
     try:
         os.dup2(fd, 0)
@@ -365,7 +365,7 @@ def launch_codex(codex: str) -> None:
         os.execv(codex, [codex])
     except OSError as exc:
         print(f"\n   Could not launch Codex ({exc}).")
-        print(f"   Run this, press 't' to trust all, then quit:\n\n     {codex}\n")
+        print(f"   Run this, choose 'Trust all and continue', then quit:\n\n     {codex}\n")
 
 
 def install(key: str, server: str, workspace: str, source: str, path_fix: bool,
@@ -397,15 +397,17 @@ def install(key: str, server: str, workspace: str, source: str, path_fix: bool,
 
     invoke = "codex" if (on_path or path_fix) else codex
     print("\n✅ Installed. One step left, and only you can do it.\n")
-    print("   Codex is about to open and show a Trust dialog listing three hooks —")
+    print("   Codex is about to open and ask you to review three hooks —")
     print("   SessionStart, UserPromptSubmit and Stop.")
-    print("\n     >>> Press 't' to trust all, then quit. <<<\n")
+    print("\n     >>> Choose 'Trust all and continue', then quit. <<<\n")
     print("   Required once. Codex has no flag for this and the trust hash is")
     print("   internal, so no installer can grant it for you.")
     print("\n   Afterwards, capture and memory injection run automatically in the CLI,")
     print("   the desktop app and the VS Code panel alike.")
     print("   Verify with: recall <a topic you've worked on>")
     print("   Tip: /catchup for a grounded catch-up on recent work.")
+    print("\n   Already have a Codex session open? In it, run /hooks and press 't' to")
+    print("   trust all, then /new. No need to quit.")
     print("\n   NOTE: if you use the ChatGPT desktop app, fully quit (Cmd-Q) and")
     print("   reopen it after this. It reads config only at launch, so Settings ->")
     print("   Hooks stays empty until you restart even though trust succeeded.")

@@ -397,7 +397,8 @@ def _done_line(client: str) -> str:
     if client == "cursor":
         return "Memory is on. Fully quit and reopen Cursor once so it picks up the memory tools."
     if client == "codex":
-        return "Memory is on. Quit and reopen Codex once so it picks up the memory tools."
+        return ("Memory is on. Capture works now. Type /new to start a new chat and the memory tools are "
+                "there too; no need to quit Codex.")
     return "Memory is on."
 
 
@@ -471,7 +472,8 @@ def cmd_login(a) -> int:
     if s == "pending":
         print("\nStill waiting for you to finish in the browser. Take your time: the sign-in stays open for "
               "10 minutes, and memory turns on as soon as you click Connect"
-              + (", with no restart." if client == "claude-code" else "."))
+              + (", with no restart." if client == "claude-code" else
+                 "; then type /new for the memory tools." if client == "codex" else "."))
         return 0
     if s == "denied":
         print("\nSign-in was cancelled. Nothing was connected.")
@@ -733,7 +735,9 @@ def _upgrade_codex() -> int:
     new = _codex_cached_version(mkt)
     if new and old and _vkey(new) > _vkey(old):
         print(f"Updated the Assertion plugin from {old} to {new}.")
-        print("Quit and reopen Codex so the new version loads.")
+        print("Quit and reopen Codex now, including any other open Codex windows. The previous version's "
+              "files were replaced, so capture fails in sessions that are still open until they restart "
+              "(/new is not enough).")
     else:
         print(f"Already on the latest version ({old or new or 'unknown'}). Nothing to do.")
     return 0
