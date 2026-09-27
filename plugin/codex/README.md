@@ -34,6 +34,7 @@ That's the whole install. Codex shows a **Hooks need review** dialog for the
 SessionStart / UserPromptSubmit / Stop hooks — **Trust all and continue** trusts all three, then quit.
 (Already in a Codex session? Run `/hooks`, press **`t`** to trust all, then `/new`: the hooks,
 memory tools and skills all load without quitting.)
+To sign out on this computer, ask Codex to "sign out of Assertion" (the `assertion-logout` skill).
 Required once, and it is the one step no installer can do for you: Codex has no
 `--trust` flag, and the trusted-hash format is internal, so the installer does not
 forge it. Afterwards the hooks run automatically, in the terminal CLI and the

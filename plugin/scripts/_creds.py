@@ -152,6 +152,29 @@ def save_api_key(key: str, email: str | None = None) -> str:
     return path
 
 
+def clear_api_key() -> tuple[str, str | None] | None:
+    """Sign out: take the key (and the email that came with it) out of the credentials file,
+    keeping any other fields; the file goes when nothing is left. Returns (path, email), or None
+    when there was no saved key."""
+    global _CACHE
+    path = credentials_file()
+    try:
+        with open(path) as f:
+            d = json.load(f)
+    except Exception:
+        return None
+    if not isinstance(d, dict) or not d.get("api_key"):
+        return None
+    email = d.pop("email", None)
+    d.pop("api_key", None)
+    if d:
+        write_private(path, json.dumps(d, indent=2) + "\n")
+    else:
+        os.remove(path)
+    _CACHE = None
+    return path, email if isinstance(email, str) else None
+
+
 def mcp_headers() -> dict:
     """Headers for the MCP server, exactly what plugin/.mcp.json used to template from the
     environment (`x-api-key: ${ASSERTION_API_KEY}`, `X-Assertion-Workspace:

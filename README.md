@@ -34,7 +34,7 @@ no restart and no key to copy. Then try `recall <topic>`. Until you sign in, eac
 with a one-line notice that memory is off.
 
 On a machine with no browser (SSH, a server), `/assertion:login code` shows a short code to
-confirm from any device instead.
+confirm from any device instead. `/assertion:logout` signs this computer out and turns memory off.
 
 **Requirements:** a system `python3` (for the two stdlib hooks). No other deps — the
 memory tools connect over HTTP.
@@ -60,7 +60,7 @@ codex plugin add assertion@assertion-ai
 python3 "$(ls -d ~/.codex/plugins/cache/*/assertion/*/scripts | sort -V | tail -1)/assertion.py" login --client codex
 ```
 Or, once Codex is open, ask it to "sign in to Assertion" (the plugin's `assertion-login` skill runs
-the same sign-in). Either way the key is saved for the hooks and written into
+the same sign-in; "sign out of Assertion" runs `assertion-logout`). Either way the key is saved for the hooks and written into
 `~/.codex/config.toml` for the memory tools.
 
 3. Use Codex **interactively** (`codex` in a terminal, or the VS Code Codex panel — *not*

@@ -257,6 +257,76 @@ def _write_codex_mcp(key: str, create: bool = False) -> str | None:
     return CODEX_CONFIG
 
 
+def _clear_cursor_key() -> str | None:
+    """Take the key out of our entry in Cursor's mcp.json (the header login wrote), keeping the
+    entry itself, so a later sign-in writes the key back in the same place. Other servers are left
+    alone."""
+    if not os.path.exists(CURSOR_MCP):
+        return None
+    d = _load_json(CURSOR_MCP)
+    servers = d.get("mcpServers") if isinstance(d.get("mcpServers"), dict) else {}
+    ours = servers.get("assertion") if isinstance(servers.get("assertion"), dict) else None
+    headers = ours.get("headers") if ours and isinstance(ours.get("headers"), dict) else {}
+    kept = {k: v for k, v in headers.items() if k.lower() not in ("authorization", "x-api-key")}
+    if not ours or kept == headers:
+        return None
+    ours = dict(ours)
+    if kept:
+        ours["headers"] = kept
+    else:
+        ours.pop("headers", None)
+    servers["assertion"] = ours
+    d["mcpServers"] = servers
+    _creds.write_private(CURSOR_MCP, json.dumps(d, indent=2) + "\n")
+    return CURSOR_MCP
+
+
+def _clear_codex_key() -> str | None:
+    """Take the key out of our [mcp_servers.assertion] table in Codex's config.toml: its
+    http_headers line (what login writes) or an http_headers subtable. The url stays, so a later
+    sign-in fills the key back in. Every other line of the file is kept as it was, in place."""
+    if not os.path.exists(CODEX_CONFIG):
+        return None
+    with open(CODEX_CONFIG) as f:
+        lines = f.read().splitlines(keepends=True)
+    out, inside, drop, changed = [], False, False, False
+    for line in lines:
+        m = _TOML_HEADER.match(line)
+        if m:
+            name = m.group(1).strip().strip('"')
+            inside = name == _CODEX_SECTION or name.startswith(_CODEX_SECTION + ".")
+            drop = name == _CODEX_SECTION + ".http_headers"
+            if drop:
+                changed = True
+                continue
+        elif drop:
+            continue
+        elif inside and re.match(r"^\s*(http_headers|bearer_token)\s*=", line):
+            changed = True
+            continue
+        out.append(line)
+    if not changed:
+        return None
+    _creds.write_private(CODEX_CONFIG, "".join(out))
+    return CODEX_CONFIG
+
+
+def _clear_codex_keyfile() -> str | None:
+    """An older Codex setup kept the key in ~/.codex/assertion.json; take it out of there too."""
+    if not os.path.exists(CODEX_KEYFILE):
+        return None
+    d = _load_json(CODEX_KEYFILE)
+    if not d.get("api_key"):
+        return None
+    d.pop("api_key", None)
+    d.pop("email", None)
+    if d:
+        _creds.write_private(CODEX_KEYFILE, json.dumps(d, indent=2) + "\n")
+    else:
+        os.remove(CODEX_KEYFILE)
+    return CODEX_KEYFILE
+
+
 class _CallbackHandler(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
@@ -483,6 +553,76 @@ def cmd_login(a) -> int:
         return 1
     print(f"\nSign-in didn't finish: {st.get('message') or 'unknown error'}")
     return 1
+
+
+# --------------------------------------------------------------------------------------------- #
+# logout
+# --------------------------------------------------------------------------------------------- #
+
+def _env_key_source() -> str | None:
+    """Where a key that sign-out can't remove comes from, if anywhere."""
+    for n in ("ASSERTION_API_KEY", "CONTEXT_TREE_API_KEY"):
+        try:
+            env = (_load_json(os.path.expanduser("~/.claude/settings.json")).get("env") or {})
+        except Exception:
+            env = {}
+        if isinstance(env, dict) and env.get(n):
+            return f"{n} is set in ~/.claude/settings.json (under \"env\")"
+        if os.environ.get(n):
+            return f"{n} is set in your environment"
+    return None
+
+
+def _tools_line(client: str) -> str:
+    # Claude Code, verified: an open session's memory tools keep the connection they started with,
+    # even after /reload-plugins; its headers helper runs again only in a new session.
+    return {"claude-code": "Memory tools already open in this session keep working until you close it; "
+                           "new sessions start signed out.",
+            "cursor": "The memory tools may stay connected until you restart Cursor.",
+            "codex": "Chats already open keep the memory tools until you start a new one with /new."}[client]
+
+
+def _home_short(p: str) -> str:
+    h = os.path.expanduser("~")
+    return "~" + p[len(h):] if p.startswith(h + os.sep) else p
+
+
+def cmd_logout(a) -> int:
+    client = a.client
+    removed, email, notes = [], None, []
+    try:
+        r = _creds.clear_api_key()
+        if r:
+            removed.append(r[0])
+            email = r[1]
+    except Exception as e:
+        notes.append(f"could not update {_home_short(_creds.credentials_file())}: {e}")
+    for name, fn in (("Cursor", _clear_cursor_key), ("Codex", _clear_codex_key), ("Codex", _clear_codex_keyfile)):
+        try:
+            p = fn()
+            if p:
+                removed.append(p)
+        except Exception as e:
+            notes.append(f"could not update the {name} memory tools config: {e}")
+    env = _env_key_source()
+    if not removed:
+        print("You're not signed in on this computer, so there was nothing to sign out of.")
+    else:
+        who = f" of {email}" if email else ""
+        print(f"Signed out{who} on this computer. Removed the saved key from "
+              + ", ".join(_home_short(p) for p in removed) + ".")
+        if not env:
+            print("Memory is off. Capture stops from your next message. " + _tools_line(client))
+    if env:
+        print(f"Memory is still on: {env}. Remove it there to turn memory off.")
+    for n in notes:
+        print(f"Note: {n}")
+    if removed:
+        print("This only signs out this computer; the key still works anywhere else you use it. "
+              "To turn it off everywhere, rotate it at studio.assertion-ai.com/connect.")
+        print("Sign back in any time: " + {"claude-code": "/assertion:login", "cursor": "/assertion-login"}.get(
+            client, "ask Codex to sign in to Assertion (the assertion-login skill)") + ".")
+    return 1 if notes else 0
 
 
 # --------------------------------------------------------------------------------------------- #
@@ -764,7 +904,7 @@ def cmd_upgrade(a) -> int:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="assertion.py")
     sub = ap.add_subparsers(dest="cmd", required=True)
-    for name in ("login", "space", "upgrade"):
+    for name in ("login", "logout", "space", "upgrade"):
         p = sub.add_parser(name)
         p.add_argument("--client", choices=sorted(CLIENT_NAMES), default="claude-code")
         if name == "login":
@@ -793,7 +933,7 @@ def main(argv=None) -> int:
         words = {w.lower().lstrip("-") for w in a.rest}
         a.again = a.again or bool(words & {"again", "force", "switch"})
         a.code = a.code or "code" in words
-    return {"login": cmd_login, "space": cmd_space, "upgrade": cmd_upgrade}[a.cmd](a)
+    return {"login": cmd_login, "logout": cmd_logout, "space": cmd_space, "upgrade": cmd_upgrade}[a.cmd](a)
 
 
 if __name__ == "__main__":

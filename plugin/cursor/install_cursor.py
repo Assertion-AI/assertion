@@ -34,7 +34,7 @@ CURSOR_MCP = os.path.join(HOME, ".cursor", "mcp.json")
 CURSOR_COMMANDS = os.path.join(HOME, ".cursor", "commands")
 PROD = "https://memory.assertion-ai.com"
 SCRIPT_NAMES = ("sessionstart_inject.py", "userpromptsubmit_delta.py", "hook_on_stop.py", "hook_on_compact.py")
-COMMAND_NAMES = ("catchup.md", "upgrade.md", "assertion-login.md", "assertion-space.md")
+COMMAND_NAMES = ("catchup.md", "upgrade.md", "assertion-login.md", "assertion-logout.md", "assertion-space.md")
 
 
 def _scripts_dir() -> str:
