@@ -27,8 +27,8 @@ python3 install_cursor.py
 It saves the sign-in to `~/.assertion/credentials.json`, adds the hooks to
 `~/.cursor/hooks.json`, and adds the recall/expand MCP server to `~/.cursor/mcp.json` —
 merging into any existing Cursor config (it won't touch your other hooks or MCP servers)
-and backing up anything it changes. It also adds four commands: `/catchup`, `/assertion-login`
-(sign in again), `/assertion-space` (list or switch memory spaces) and `/upgrade` (pull the latest
+and backing up anything it changes. It also adds five commands: `/catchup`, `/assertion-login`
+(sign in again), `/assertion-logout` (sign this computer out), `/assertion-space` (list or switch memory spaces) and `/upgrade` (pull the latest
 version into this clone).
 
 Then **fully quit and reopen Cursor** — that's it. On launch Cursor loads what the script

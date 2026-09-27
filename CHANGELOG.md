@@ -3,6 +3,17 @@
 Notable changes to the Assertion plugin for Claude Code, Cursor and Codex. Each version here
 becomes a GitHub release when it reaches `main`.
 
+## [0.3.9] — 2026-09-27
+
+- Sign out with `/assertion:logout` (Cursor: `/assertion-logout`; Codex: the `assertion-logout`
+  skill). It removes the key that sign-in saved on this computer: the credentials file, and the key
+  in Cursor's `mcp.json` and Codex's `config.toml` (your other servers and settings are left as
+  they were). Capture stops from your next message. In Claude Code, memory tools already open in
+  a session keep working until you close it; new sessions start signed out. The key itself still
+  works anywhere else you use it; to turn it off everywhere, rotate it at
+  studio.assertion-ai.com/connect. If `ASSERTION_API_KEY` is set, it says memory is still on and
+  where the key comes from.
+
 ## [0.3.8] — 2026-09-25
 
 - Sign in with `/assertion:login`: your browser opens, you click Connect, and memory is on. There is

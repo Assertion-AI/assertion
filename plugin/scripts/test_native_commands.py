@@ -256,8 +256,8 @@ inst = os.path.join(ROOT, "plugin", "cursor", "install_cursor.py")
 r = subprocess.run([sys.executable, inst, "--key", KEY, "--server", BASE], env=env(), capture_output=True, text=True, timeout=60)
 cdir = os.path.join(HOME, ".cursor", "commands")
 sp = open(os.path.join(cdir, "assertion-space.md")).read() if os.path.exists(os.path.join(cdir, "assertion-space.md")) else ""
-check("cursor install: copies catchup, upgrade, assertion-login and assertion-space",
-      all(os.path.exists(os.path.join(cdir, n)) for n in ("catchup.md", "upgrade.md", "assertion-login.md", "assertion-space.md")), r.stdout + r.stderr)
+check("cursor install: copies catchup, upgrade, assertion-login, assertion-logout and assertion-space",
+      all(os.path.exists(os.path.join(cdir, n)) for n in ("catchup.md", "upgrade.md", "assertion-login.md", "assertion-logout.md", "assertion-space.md")), r.stdout + r.stderr)
 check("cursor install: commands name this clone's script by absolute path",
       os.path.join(HERE, "assertion.py") in sp and "{{ASSERTION}}" not in sp and "space --client cursor" in sp)
 check("cursor install: mcp.json and credentials are 0600",
@@ -267,8 +267,8 @@ os.remove(os.path.join(cdir, "upgrade.md"))
 subprocess.run([sys.executable, inst, "--commands-only"], env=env(), capture_output=True, text=True, timeout=60)
 check("cursor --commands-only: restores the commands (what /upgrade runs after a pull)", os.path.exists(os.path.join(cdir, "upgrade.md")))
 subprocess.run([sys.executable, inst, "--uninstall"], env=env(), capture_output=True, text=True, timeout=60)
-check("cursor uninstall: removes all four commands", not any(os.path.exists(os.path.join(cdir, n))
-      for n in ("catchup.md", "upgrade.md", "assertion-login.md", "assertion-space.md")))
+check("cursor uninstall: removes all five commands", not any(os.path.exists(os.path.join(cdir, n))
+      for n in ("catchup.md", "upgrade.md", "assertion-login.md", "assertion-logout.md", "assertion-space.md")))
 
 # ---- 10. no SessionStart (plugin turned on by /reload-plugins): the first prompt covers it -----
 def prompt(payload, **extra):
@@ -348,6 +348,72 @@ check("launcher: nothing installed -> exits 0 silently (fail-open)", rc == 0 and
 os.remove(LAUNCHER)
 rc, out, err = run_hook("SessionStart", "/nonexistent/0.3.7")
 check("no launcher and the plugin dir is gone -> exits 0 silently", rc == 0 and out == "" and err == "", out + err)
+
+# ---- 11. sign-out ------------------------------------------------------------------------------
+def code_login(client="claude-code"):
+    p = subprocess.Popen([sys.executable, os.path.join(HERE, "assertion.py"), "login", "code", "--client", client],
+                         env=env(ASSERTION_LOGIN_WAIT="20"), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    time.sleep(1.5)
+    for d in S["devices"].values(): d["status"] = "approved"
+    return p.communicate(timeout=60)[0]
+reset_home()
+CUR, COD = os.path.join(HOME, ".cursor", "mcp.json"), os.path.join(HOME, ".codex", "config.toml")
+os.makedirs(os.path.dirname(CUR), exist_ok=True); os.makedirs(os.path.dirname(COD), exist_ok=True)
+json.dump({"mcpServers": {"other": {"url": "https://x", "headers": {"Authorization": "Bearer THEIRS"}},
+                          "assertion": {"url": "https://memory.assertion-ai.com/memory/mcp/default", "headers": {"Authorization": "Bearer OLD", "X-Keep": "1"}}}},
+          open(CUR, "w"))
+TOML_A = 'model = "o3"\n\n[mcp_servers.other]\nurl = "https://y"\nhttp_headers = { Authorization = "Bearer THEIRS" }\n'
+TOML_B = '\n[mcp_servers.assertion]\nurl = "https://memory.assertion-ai.com/memory/mcp/ws1"\n'
+TOML_C = '\n[mcp_servers.assertion.env]\nX = "1"\n\n[profiles.fast]\nmodel = "o4"\n'
+open(COD, "w").write(TOML_A + TOML_B + 'http_headers = { Authorization = "Bearer OLD" }\n' + TOML_C)
+out = code_login()
+check("logout setup: signed in, key written to all three", json.load(open(CREDS))["api_key"] == KEY
+      and KEY in open(CUR).read() and KEY in open(COD).read(), out)
+cod_signed_in = open(COD).read()
+rc, out = run(["logout"])
+check("logout: says who was signed out, and that memory is off", rc == 0 and "Signed out of sam@acme.test on this computer" in out
+      and "Memory is off" in out, out)
+check("logout: says what happens to this session's memory tools", "keep working until you close it" in out, out)
+check("logout: says it is this computer only, and where to turn the key off everywhere",
+      "only signs out this computer" in out and "studio.assertion-ai.com/connect" in out, out)
+check("logout: never prints the key", KEY not in out)
+check("logout: credentials file gone (nothing else was in it)", not os.path.exists(CREDS))
+cm = json.load(open(CUR))
+check("logout: Cursor keeps our entry and its other headers, minus the key",
+      cm["mcpServers"]["assertion"] == {"url": "https://memory.assertion-ai.com/memory/mcp/default", "headers": {"X-Keep": "1"}}, json.dumps(cm))
+check("logout: Cursor's other servers untouched (their own Authorization too)",
+      cm["mcpServers"]["other"] == {"url": "https://x", "headers": {"Authorization": "Bearer THEIRS"}})
+check("logout: Codex config.toml is kept line for line, minus only our key line",
+      open(COD).read() == cod_signed_in.replace(f'http_headers = {{ Authorization = "Bearer {KEY}" }}\n', "")
+      and TOML_A in open(COD).read() and "Bearer THEIRS" in open(COD).read() and 'url = "https://memory.assertion-ai.com/memory/mcp/ws1"' in open(COD).read(), open(COD).read())
+check("logout: both configs stay 0600", mode(CUR) == 0o600 and mode(COD) == 0o600)
+check("logout: the session-start notice is back", hook({"source": "startup"}).get("systemMessage", "").startswith("Assertion memory is off"))
+rc, out = run(["logout"])
+check("logout again: nothing to sign out of, exit 0", rc == 0 and "not signed in on this computer" in out and "Signed out" not in out, out)
+out = code_login()
+check("login after logout: signs in again and writes the key back into both configs",
+      "Signed in as sam@acme.test" in out and json.load(open(CREDS))["api_key"] == KEY
+      and json.load(open(CUR))["mcpServers"]["assertion"]["headers"] == {"X-Keep": "1", "Authorization": f"Bearer {KEY}"}
+      and f'Authorization = "Bearer {KEY}"' in open(COD).read(), out)
+json.dump({"api_key": KEY, "email": "sam@acme.test", "server_url": BASE}, open(CREDS, "w"))
+rc, out = run(["logout"], ASSERTION_API_KEY="env-key-1")
+check("logout with ASSERTION_API_KEY set: signs out, but says memory is still on and why",
+      "Signed out" in out and "Memory is still on: ASSERTION_API_KEY is set in your environment" in out and "Memory is off" not in out, out)
+check("logout: other fields in the credentials file are kept", json.load(open(CREDS)) == {"server_url": BASE})
+os.makedirs(os.path.join(HOME, ".claude"), exist_ok=True)
+json.dump({"env": {"ASSERTION_API_KEY": "k"}}, open(os.path.join(HOME, ".claude", "settings.json"), "w"))
+rc, out = run(["logout"])
+check("logout with the key in ~/.claude/settings.json: points there, edits nothing",
+      "not signed in" in out and "~/.claude/settings.json" in out
+      and json.load(open(os.path.join(HOME, ".claude", "settings.json"))) == {"env": {"ASSERTION_API_KEY": "k"}}, out)
+os.remove(os.path.join(HOME, ".claude", "settings.json"))
+rc, out = run(["logout", "--client", "codex"])
+check("logout from Codex, signed out: points at the sign-in skill only when something was removed", rc == 0 and "not signed in" in out, out)
+text = open(os.path.join(ROOT, "plugin", "commands", "logout.md")).read()
+check("/assertion:logout: runs the script from a ! line, user-only",
+      "assertion.py\" logout --client claude-code`" in text and "disable-model-invocation: true" in text)
+check("Cursor and Codex get sign-out too", os.path.exists(os.path.join(ROOT, "plugin", "cursor", "commands", "assertion-logout.md"))
+      and "logout --client codex" in open(os.path.join(ROOT, "plugin", "codex", "skills", "assertion-logout", "SKILL.md")).read())
 
 srv.shutdown()
 print("ALL PASS" if not fails else f"{fails} FAILED"); sys.exit(1 if fails else 0)
