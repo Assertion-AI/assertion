@@ -375,7 +375,7 @@ check("logout: says who was signed out, and that memory is off", rc == 0 and "Si
       and "Memory is off" in out, out)
 check("logout: says what happens to this session's memory tools", "keep working until you close it" in out, out)
 check("logout: says it is this computer only, and where to turn the key off everywhere",
-      "only signs out this computer" in out and "studio.assertion-ai.com/connect" in out, out)
+      "only signs out this computer" in out and "studio.assertion-ai.com/plugin" in out, out)
 check("logout: never prints the key", KEY not in out)
 check("logout: credentials file gone (nothing else was in it)", not os.path.exists(CREDS))
 cm = json.load(open(CUR))
