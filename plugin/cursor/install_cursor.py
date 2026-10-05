@@ -239,7 +239,7 @@ def main() -> int:
         key = sign_in()
     if not key:
         try:
-            key = getpass.getpass("Or paste an Assertion API key (from https://studio.assertion-ai.com/connect): ").strip()
+            key = getpass.getpass("Or paste an Assertion API key (from https://studio.assertion-ai.com/plugin): ").strip()
         except (EOFError, KeyboardInterrupt):
             print()
             return 1
