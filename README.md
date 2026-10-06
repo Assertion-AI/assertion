@@ -5,12 +5,19 @@ behind your decisions and the strategy across your project — and keeps it **cu
 superseding calls you've reversed instead of resurfacing them. It **recalls** that context
 automatically as you work, into a shared, project-scoped tree. Reads run over a hosted MCP
 endpoint (no local server); small hooks handle capture and context injection. One codebase
-serves all three agents (single copy of the logic). By Assertion AI.
+serves all three agents (single copy of the logic). By [Assertion AI](https://assertion-ai.com).
+
+Memory keeps decisions and their reasons, not your transcripts or source code.
+[What memory stores →](https://assertion-ai.com/security#memory)
 
 Install, then sign in once in your browser. There is no key to copy. Requires a system `python3`
 (for the stdlib hooks); no other deps.
 
+Step-by-step guides with troubleshooting for each tool: **[assertion-ai.com/install](https://assertion-ai.com/install?src=github)**.
+
 ## Install — Claude Code
+
+Step-by-step guide: [assertion-ai.com/install/claude-code](https://assertion-ai.com/install/claude-code?src=github).
 
 > **Already installed?** Keep the copy you have. If you installed from this repo (`assertion@assertion-ai`), don't also install it from the Claude Code community catalog (`assertion@claude-community`). Two copies means two sets of hooks, so every turn is captured twice. `/assertion:upgrade` updates whichever copy you have.
 
@@ -51,6 +58,8 @@ memory tools connect over HTTP.
 
 ## Install — OpenAI Codex
 
+Step-by-step guide: [assertion-ai.com/install/codex](https://assertion-ai.com/install/codex?src=github).
+
 ```bash
 # 1) install the plugin
 codex plugin marketplace add Assertion-AI/assertion
@@ -70,6 +79,8 @@ Capture + injection then work against the same shared tree, in CLI and VS Code. 
 Codex details (recall/expand setup, dev override): [plugin/codex/README.md](plugin/codex/README.md).
 
 ## Install — Cursor
+
+Step-by-step guide: [assertion-ai.com/install/cursor](https://assertion-ai.com/install/cursor?src=github).
 
 Cursor has no plugin marketplace, so it installs via a one-time script that wires its
 `hooks.json` + `mcp.json` for you:
