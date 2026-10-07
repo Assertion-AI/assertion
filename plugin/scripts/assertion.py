@@ -619,7 +619,7 @@ def cmd_logout(a) -> int:
         print(f"Note: {n}")
     if removed:
         print("This only signs out this computer; the key still works anywhere else you use it. "
-              "To turn it off everywhere, rotate it at studio.assertion-ai.com/connect.")
+              "To turn it off everywhere, rotate it at studio.assertion-ai.com/plugin.")
         print("Sign back in any time: " + {"claude-code": "/assertion:login", "cursor": "/assertion-login"}.get(
             client, "ask Codex to sign in to Assertion (the assertion-login skill)") + ".")
     return 1 if notes else 0
